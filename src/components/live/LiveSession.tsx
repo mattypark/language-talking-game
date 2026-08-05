@@ -172,6 +172,30 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
     return () => clearTimeout(timer);
   }, [isCallOpen, secondsRemaining, endCall]);
 
+  /** Report and hang up in one move. The call must stop, then be explained. */
+  const handleReport = useCallback(
+    (reason: string) => {
+      const sessionId =
+        matchmaker.state.sessionId ?? lastSessionIdRef.current;
+
+      void (async () => {
+        if (sessionId) {
+          try {
+            await fetch("/api/reports", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ sessionId, reason }),
+            });
+          } catch {
+            // A failed report must still end the call — that is the urgent part.
+          }
+        }
+        await endCall();
+      })();
+    },
+    [matchmaker.state.sessionId, endCall],
+  );
+
   const handleToggleMute = useCallback(() => {
     const track = mic.stream?.getAudioTracks()[0];
     if (!track) return;
@@ -248,6 +272,7 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
         onLeave={() => void endCall()}
+        onReport={handleReport}
       />
     );
   }

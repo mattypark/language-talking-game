@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LiveDot } from "@/components/ui/LiveDot";
+import { Sheet } from "@/components/ui/Sheet";
 import { Waveform } from "@/components/ui/Waveform";
 import { formatClock } from "@/hooks/useElapsed";
 import { useStreamLevels } from "@/hooks/useMicLevels";
@@ -25,6 +26,7 @@ type Props = {
   isMuted: boolean;
   onToggleMute: () => void;
   onLeave: () => void;
+  onReport: (reason: string) => void;
 };
 
 const WARNING_SECONDS = 30;
@@ -41,10 +43,12 @@ export function CallView({
   isMuted,
   onToggleMute,
   onLeave,
+  onReport,
 }: Props) {
   const remoteLevels = useStreamLevels(remoteStream);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     if (audioRef.current && remoteStream) {
@@ -138,6 +142,15 @@ export function CallView({
           next to an orange primary is a genuine misclick risk, and misclicking
           this one ends the session for both people.
         */}
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={() => setIsReporting(true)}
+          aria-label="Report this conversation"
+        >
+          Report
+        </Button>
+
         {isConfirmingLeave ? (
           <Button variant="danger" size="lg" onClick={onLeave} className="ml-auto">
             End it for both of us
@@ -153,9 +166,48 @@ export function CallView({
           </Button>
         )}
       </div>
+
+      {/*
+        Reporting ends the call on the spot. Nobody being harassed should have
+        to stay on the line through a confirmation dialog to make it stop.
+      */}
+      <Sheet
+        isOpen={isReporting}
+        onClose={() => setIsReporting(false)}
+        title="Report this conversation"
+      >
+        <p className="t-body mb-5 text-ink-muted">
+          This ends the call straight away. The last part of the recording is
+          kept so a person can review it.
+        </p>
+        <div className="space-y-2">
+          {REPORT_REASONS.map((reason) => (
+            <Button
+              key={reason.id}
+              variant="secondary"
+              isBlock
+              onClick={() => {
+                setIsReporting(false);
+                onReport(reason.id);
+              }}
+            >
+              {reason.label}
+            </Button>
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 }
+
+const REPORT_REASONS = [
+  { id: "harassment", label: "They were abusive" },
+  { id: "sexual-content", label: "Sexual content" },
+  { id: "hate-speech", label: "Hate speech" },
+  { id: "contact-swapping", label: "Asking for my contacts" },
+  { id: "not-practising", label: "Not here to practise" },
+  { id: "safety-concern", label: "I'm worried about their safety" },
+];
 
 function connectionLabel(status: CallStatus): string {
   switch (status) {
