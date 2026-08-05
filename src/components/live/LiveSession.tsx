@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useMatchmaker } from "@/hooks/useMatchmaker";
 import { useMicLevels } from "@/hooks/useMicLevels";
+import { useOwnMicRecorder } from "@/hooks/useOwnMicRecorder";
 import { useWebRtcAudio } from "@/hooks/useWebRtcAudio";
 import { SESSION_SECONDS } from "@/lib/domain";
 import type { QueueProfile } from "@/lib/matchmaker-protocol";
@@ -32,10 +33,12 @@ const COUNTDOWN_SECONDS = 3;
 export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
   const router = useRouter();
   const mic = useMicLevels({ bars: 5 });
+  const recorder = useOwnMicRecorder();
 
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [didPartnerLeave, setDidPartnerLeave] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(SESSION_SECONDS);
 
   const iceServers = useMemo<RTCIceServer[]>(
@@ -45,13 +48,25 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
 
   const receiveSignalRef = useRef<((payload: unknown) => void) | null>(null);
 
+  /*
+   * "peer-left" clears the session id from matchmaker state, but the upload
+   * that follows still needs it. Held here so the recording has somewhere to
+   * go after the partner has already gone.
+   */
+  const lastSessionIdRef = useRef<string | null>(null);
+
   const handleSignal = useCallback((payload: unknown) => {
     receiveSignalRef.current?.(payload);
   }, []);
 
+  /**
+   * They hung up. The conversation still happened, so this side's recording is
+   * still uploaded — a partner walking out must not cost you your report.
+   */
   const handlePeerLeft = useCallback(() => {
     setIsCallOpen(false);
     setCallStartedAt(null);
+    setDidPartnerLeave(true);
   }, []);
 
   const matchmaker = useMatchmaker({
@@ -76,6 +91,12 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
     receiveSignalRef.current = webrtc.receiveSignal;
   }, [webrtc.receiveSignal]);
 
+  useEffect(() => {
+    if (matchmaker.state.sessionId) {
+      lastSessionIdRef.current = matchmaker.state.sessionId;
+    }
+  }, [matchmaker.state.sessionId]);
+
   const { phase } = matchmaker.state;
   const { enqueue } = matchmaker;
 
@@ -98,13 +119,58 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
     return () => clearInterval(timer);
   }, [callStartedAt]);
 
-  const handleLeave = useCallback(() => {
+  /**
+   * Ends the call and gets this side's own recording uploaded.
+   *
+   * The upload is awaited before navigating: a page transition mid-POST loses
+   * the audio, and a session with one track is a session nobody can be scored
+   * on.
+   */
+  const endCall = useCallback(async () => {
+    const sessionId = matchmaker.state.sessionId;
+
     matchmaker.leave();
     webrtc.close();
     setIsCallOpen(false);
     setCallStartedAt(null);
-    router.push("/practice");
-  }, [matchmaker, webrtc, router]);
+
+    if (sessionId && recorder.status === "recording") {
+      await recorder.stopAndUpload(sessionId, profile.id);
+    } else {
+      recorder.discard();
+    }
+
+    router.push(sessionId ? `/practice?session=${sessionId}` : "/practice");
+  }, [matchmaker, webrtc, recorder, profile.id, router]);
+
+  /**
+   * The partner hung up. Their leaving does not delete the conversation that
+   * already happened, so this side's recording is still uploaded and still
+   * scored.
+   */
+  useEffect(() => {
+    if (!didPartnerLeave) return;
+
+    const sessionId = matchmaker.state.sessionId ?? lastSessionIdRef.current;
+    void (async () => {
+      if (sessionId && recorder.status === "recording") {
+        await recorder.stopAndUpload(sessionId, profile.id);
+      }
+      router.push(sessionId ? `/practice?session=${sessionId}` : "/practice");
+    })();
+  }, [didPartnerLeave, matchmaker.state.sessionId, recorder, profile.id, router]);
+
+  /**
+   * Time is up. Ends itself rather than waiting for someone to notice.
+   *
+   * Deferred by a tick because endCall writes state immediately, and doing
+   * that synchronously inside an effect cascades a second render.
+   */
+  useEffect(() => {
+    if (!isCallOpen || secondsRemaining > 0) return;
+    const timer = setTimeout(() => void endCall(), 0);
+    return () => clearTimeout(timer);
+  }, [isCallOpen, secondsRemaining, endCall]);
 
   const handleToggleMute = useCallback(() => {
     const track = mic.stream?.getAudioTracks()[0];
@@ -117,9 +183,27 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
   const openCall = useCallback(async () => {
     const stream = mic.stream ?? (await mic.start());
     if (!stream) return;
+
+    const { sessionId, topic } = matchmaker.state;
+
+    // Register the session before recording, so the upload has somewhere to go.
+    if (sessionId && topic) {
+      try {
+        await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId, topicId: topic.id }),
+        });
+      } catch {
+        // A failed registration costs the report, not the conversation. Let
+        // them talk; the upload will surface the problem.
+      }
+    }
+
+    recorder.start(stream);
     setIsCallOpen(true);
     setCallStartedAt(Date.now());
-  }, [mic]);
+  }, [mic, matchmaker.state, recorder]);
 
   if (matchmaker.state.errorMessage) {
     return (
@@ -163,7 +247,7 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
         remoteStream={webrtc.remoteStream}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
-        onLeave={handleLeave}
+        onLeave={() => void endCall()}
       />
     );
   }

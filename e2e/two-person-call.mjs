@@ -11,6 +11,7 @@
  *   cd services/matchmaker && npm start
  *   npm i -D playwright && node e2e/two-person-call.mjs
  */
+import { readdir } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:3000";
@@ -163,6 +164,23 @@ await alice.page.getByRole("button", { name: "Leave" }).click();
 await alice.page.getByRole("button", { name: /End it/i }).click();
 await bob.page.waitForSelector("text=/queue/i", { timeout: 10_000 });
 console.log("ok   the other side was returned to the queue on hang-up");
+
+// Both sides upload their OWN microphone. Two files, one speaker each — that
+// is what makes the scoring attributable without a diarization step.
+await new Promise((r) => setTimeout(r, 3000));
+
+const sessionDirs = await readdir(".data/audio").catch(() => []);
+let found = [];
+for (const dir of sessionDirs) {
+  const files = await readdir(`.data/audio/${dir}`).catch(() => []);
+  if (files.length >= 2) found = files;
+}
+if (found.length < 2) {
+  throw new Error(
+    `expected two per-speaker recordings, found ${found.length} (dirs: ${sessionDirs.length})`,
+  );
+}
+console.log(`ok   both sides uploaded their own track (${found.length} files)`);
 
 console.log(`\nconsole/page errors: ${errors.length}`);
 if (errors.length) console.log(errors.slice(0, 6).join("\n"));
