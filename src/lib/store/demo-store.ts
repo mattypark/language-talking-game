@@ -26,15 +26,24 @@ import type { AgeBandId, LevelBandId, TargetLanguageCode } from "@/lib/domain";
 
 const DATA_FILE = join(process.cwd(), ".data", "onair.json");
 
-let cache: Database | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
+/**
+ * Always reads from disk. Deliberately not cached in memory.
+ *
+ * Next runs server components and route handlers in separate module graphs, so
+ * a module-level cache is not one cache — it is several, and they drift. The
+ * symptom is vicious: pages resolve the signed-in user correctly while every
+ * API route returns 401, because the route's copy of the database was loaded
+ * before that profile existed.
+ *
+ * A few kilobytes of JSON per request is free, and this is a development store
+ * that Supabase replaces. Correctness wins.
+ */
 async function load(): Promise<Database> {
-  if (cache) return cache;
-
   try {
     const raw = await readFile(DATA_FILE, "utf8");
-    cache = { ...EMPTY_DATABASE, ...(JSON.parse(raw) as Partial<Database>) };
+    return { ...EMPTY_DATABASE, ...(JSON.parse(raw) as Partial<Database>) };
   } catch (error: unknown) {
     const isMissing =
       error instanceof Error && "code" in error && error.code === "ENOENT";
@@ -45,10 +54,8 @@ async function load(): Promise<Database> {
         }`,
       );
     }
-    cache = structuredClone(EMPTY_DATABASE);
+    return structuredClone(EMPTY_DATABASE);
   }
-
-  return cache;
 }
 
 /** Serialised so two overlapping requests cannot interleave a read-modify-write. */
@@ -202,7 +209,112 @@ export async function listSessionsForProfile(
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
-/** Test seam. The cache is process-wide, so tests need a way to drop it. */
-export function resetCacheForTests(): void {
-  cache = null;
+/**
+ * Creates the session if it is new, otherwise adds this participant to it —
+ * all inside one mutation.
+ *
+ * Both browsers register the same session at the same moment. Doing this as a
+ * read then a write lets both see "no session yet", both create one, and the
+ * second overwrite the first — leaving one person absent from their own
+ * session and their upload rejected as a stranger's.
+ */
+export async function upsertSessionParticipant(
+  draft: PracticeSession,
+  participant: PracticeSession["participants"][number],
+): Promise<{ session: PracticeSession; created: boolean }> {
+  return mutate((db) => {
+    const existing = db.sessions[draft.id];
+
+    if (!existing) {
+      const session = { ...draft, participants: [participant] };
+      db.sessions[draft.id] = session;
+      return { session, created: true };
+    }
+
+    const alreadyListed = existing.participants.some(
+      (p) => p.profileId === participant.profileId,
+    );
+    const session = alreadyListed
+      ? existing
+      : { ...existing, participants: [...existing.participants, participant] };
+
+    db.sessions[draft.id] = session;
+    return { session, created: false };
+  });
+}
+
+/**
+ * Attaches one participant's recording, atomically.
+ *
+ * Both uploads land at almost the same moment. Read-then-write lets the second
+ * writer overwrite the first, silently dropping one person's audioKey — the
+ * session then looks half-recorded, talk share cannot be computed, and the
+ * Interaction trait quietly disappears from someone's report.
+ *
+ * Returns whether every participant has now uploaded, so the caller does not
+ * have to re-read and race again to find out.
+ */
+export async function attachParticipantAudio(
+  sessionId: string,
+  profileId: string,
+  audioKey: string,
+  voicedSeconds: number,
+): Promise<{ everyoneUploaded: boolean } | null> {
+  return mutate((db) => {
+    const session = db.sessions[sessionId];
+    if (!session) return null;
+
+    const participants = session.participants.map((p) =>
+      p.profileId === profileId ? { ...p, audioKey, voicedSeconds } : p,
+    );
+    const everyoneUploaded = participants.every((p) => p.audioKey !== null);
+
+    db.sessions[sessionId] = {
+      ...session,
+      participants,
+      ...(everyoneUploaded
+        ? { status: "ended" as const, endedAt: new Date().toISOString() }
+        : {}),
+    };
+
+    return { everyoneUploaded };
+  });
+}
+
+export async function listSessions(): Promise<PracticeSession[]> {
+  const db = await load();
+  return Object.values(db.sessions);
+}
+
+/* ------------------------------------------------------------------- reports */
+
+function reportKey(sessionId: string, profileId: string): string {
+  return `${sessionId}:${profileId}`;
+}
+
+export async function saveReport(report: {
+  sessionId: string;
+  profileId: string;
+}): Promise<void> {
+  await mutate((db) => {
+    db.reports[reportKey(report.sessionId, report.profileId)] = report;
+  });
+}
+
+export async function getReport<T>(
+  sessionId: string,
+  profileId: string,
+): Promise<T | null> {
+  const db = await load();
+  return (db.reports[reportKey(sessionId, profileId)] as T) ?? null;
+}
+
+/** Newest first. Used for the progress sparkline and the recurring-error log. */
+export async function listReportsForProfile<T extends { profileId: string; createdAt: string }>(
+  profileId: string,
+): Promise<T[]> {
+  const db = await load();
+  return (Object.values(db.reports) as T[])
+    .filter((report) => report.profileId === profileId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

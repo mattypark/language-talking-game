@@ -167,13 +167,16 @@ console.log("ok   the other side was returned to the queue on hang-up");
 
 // Both sides upload their OWN microphone. Two files, one speaker each — that
 // is what makes the scoring attributable without a diarization step.
-await new Promise((r) => setTimeout(r, 3000));
-
-const sessionDirs = await readdir(".data/audio").catch(() => []);
 let found = [];
-for (const dir of sessionDirs) {
-  const files = await readdir(`.data/audio/${dir}`).catch(() => []);
-  if (files.length >= 2) found = files;
+let sessionDirs = [];
+const uploadDeadline = Date.now() + 20_000;
+while (Date.now() < uploadDeadline && found.length < 2) {
+  sessionDirs = await readdir(".data/audio").catch(() => []);
+  for (const dir of sessionDirs) {
+    const files = await readdir(`.data/audio/${dir}`).catch(() => []);
+    if (files.length >= 2) found = files;
+  }
+  if (found.length < 2) await new Promise((r) => setTimeout(r, 1000));
 }
 if (found.length < 2) {
   throw new Error(
@@ -181,6 +184,25 @@ if (found.length < 2) {
   );
 }
 console.log(`ok   both sides uploaded their own track (${found.length} files)`);
+
+// Alice was sent to her report. The whole pipeline runs behind it:
+// transcript -> deterministic metrics -> rubric -> validated corrections.
+await alice.page.waitForURL("**/practice/report/**", { timeout: 10_000 });
+await alice.page.waitForSelector("text=You spoke.", { timeout: 40_000 });
+console.log("ok   report generated for the caller");
+
+const bandText = await alice.page.locator("p.t-title-2").allInnerTexts();
+console.log(`     report headings: ${bandText.slice(0, 3).join(" | ")}`);
+await alice.page.screenshot({ path: `${OUT}/s9-report.png`, fullPage: true });
+
+// The report must be scoped to its owner: Bob may not read Alice's.
+const aliceUrl = new URL(alice.page.url());
+const stolen = await bob.page.evaluate(async (path) => {
+  const res = await fetch(path.replace("/practice/report/", "/api/sessions/") + "/score");
+  return res.status;
+}, aliceUrl.pathname);
+if (stolen === 200) throw new Error("a partner was able to read someone else's report");
+console.log(`ok   partner cannot read the other person's report (HTTP ${stolen})`);
 
 console.log(`\nconsole/page errors: ${errors.length}`);
 if (errors.length) console.log(errors.slice(0, 6).join("\n"));

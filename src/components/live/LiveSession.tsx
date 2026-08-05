@@ -140,7 +140,7 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
       recorder.discard();
     }
 
-    router.push(sessionId ? `/practice?session=${sessionId}` : "/practice");
+    router.push(sessionId ? `/practice/report/${sessionId}` : "/practice");
   }, [matchmaker, webrtc, recorder, profile.id, router]);
 
   /**
@@ -156,7 +156,7 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
       if (sessionId && recorder.status === "recording") {
         await recorder.stopAndUpload(sessionId, profile.id);
       }
-      router.push(sessionId ? `/practice?session=${sessionId}` : "/practice");
+      router.push(sessionId ? `/practice/report/${sessionId}` : "/practice");
     })();
   }, [didPartnerLeave, matchmaker.state.sessionId, recorder, profile.id, router]);
 

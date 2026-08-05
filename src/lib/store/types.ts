@@ -50,18 +50,26 @@ export type PracticeSession = {
   participants: SessionParticipant[];
   /** "ended" once both sides leave; "scored" once reports exist. */
   status: "live" | "ended" | "scored" | "abandoned";
+  /**
+   * When the recordings get deleted. Set once a report exists; null once the
+   * purge has run.
+   */
+  audioExpiresAt?: string | null;
 };
 
 export type Database = {
   profiles: Record<string, Profile>;
   cohorts: Record<string, Cohort>;
   sessions: Record<string, PracticeSession>;
+  /** Keyed `${sessionId}:${profileId}` — one report per person per session. */
+  reports: Record<string, unknown>;
 };
 
 export const EMPTY_DATABASE: Database = {
   profiles: {},
   cohorts: {},
   sessions: {},
+  reports: {},
 };
 
 export const STARTING_TRUST = 100;

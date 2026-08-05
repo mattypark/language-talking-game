@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { createSession, getSession, updateSession } from "@/lib/store/demo-store";
+import { upsertSessionParticipant } from "@/lib/store/demo-store";
 import type { PracticeSession } from "@/lib/store/types";
 
 type Body = {
@@ -44,30 +44,17 @@ export async function POST(request: Request) {
     voicedSeconds: 0,
   };
 
-  const existing = await getSession(sessionId);
+  const draft: PracticeSession = {
+    id: sessionId,
+    cohortId:
+      typeof cohortId === "string" ? cohortId : (profile.cohortIds[0] ?? ""),
+    topicId,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    participants: [],
+    status: "live",
+  };
 
-  if (!existing) {
-    const session: PracticeSession = {
-      id: sessionId,
-      cohortId: typeof cohortId === "string" ? cohortId : (profile.cohortIds[0] ?? ""),
-      topicId,
-      startedAt: new Date().toISOString(),
-      endedAt: null,
-      participants: [participant],
-      status: "live",
-    };
-    await createSession(session);
-    return NextResponse.json({ ok: true, created: true });
-  }
-
-  const alreadyListed = existing.participants.some(
-    (p) => p.profileId === profile.id,
-  );
-  if (!alreadyListed) {
-    await updateSession(sessionId, {
-      participants: [...existing.participants, participant],
-    });
-  }
-
-  return NextResponse.json({ ok: true, created: false });
+  const { created } = await upsertSessionParticipant(draft, participant);
+  return NextResponse.json({ ok: true, created });
 }

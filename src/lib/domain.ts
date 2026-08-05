@@ -102,6 +102,19 @@ export const COMMON_FIRST_LANGUAGES = [
 export const SESSION_SECONDS = 300;
 export const EXTEND_SECONDS = 180;
 
-/** Below these floors no score is issued — see the anti-gaming notes in stage 10. */
+/**
+ * Floors below which no score is issued.
+ *
+ * Crucially the answer is "not enough speech to assess", never a low score.
+ * If staying quiet produced a bad number, the way to protect your average
+ * would be to say nothing — which is the opposite of the product.
+ *
+ * 90 seconds is calibrated to a five-minute session: two people sharing the
+ * time evenly speak for about 120s each once gaps are removed, so this catches
+ * the genuinely silent without punishing the merely quiet.
+ */
 export const MIN_TALK_SHARE = 0.3;
-export const MIN_VOICED_SECONDS = 180;
+export const MIN_VOICED_SECONDS = 90;
+
+/** Above this, the Interaction trait is capped — a monologue is not a conversation. */
+export const MAX_HEALTHY_TALK_SHARE = 0.75;

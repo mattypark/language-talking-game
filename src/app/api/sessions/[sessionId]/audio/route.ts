@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { MAX_AUDIO_BYTES, audioKeyFor, saveAudio } from "@/lib/store/audio";
-import { getSession, updateSession } from "@/lib/store/demo-store";
+import { attachParticipantAudio, getSession } from "@/lib/store/demo-store";
 
 /**
  * Receives one participant's own microphone recording.
@@ -53,22 +53,18 @@ export async function POST(
     ? Math.max(0, Math.round(claimedMs / 1000))
     : 0;
 
-  await updateSession(sessionId, {
-    participants: session.participants.map((p) =>
-      p.profileId === profile.id ? { ...p, audioKey: key, voicedSeconds } : p,
-    ),
-  });
+  const attached = await attachParticipantAudio(
+    sessionId,
+    profile.id,
+    key,
+    voicedSeconds,
+  );
 
-  const updated = await getSession(sessionId);
-  const everyoneUploaded =
-    updated?.participants.every((p) => p.audioKey !== null) ?? false;
-
-  if (everyoneUploaded) {
-    await updateSession(sessionId, {
-      status: "ended",
-      endedAt: new Date().toISOString(),
-    });
+  if (!attached) {
+    return NextResponse.json({ error: "no-such-session" }, { status: 404 });
   }
+
+  const everyoneUploaded = attached.everyoneUploaded;
 
   return NextResponse.json({
     ok: true,
