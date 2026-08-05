@@ -320,7 +320,10 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
         matchmaker.cancel();
         router.push("/practice");
       }}
-      onUseAiPartner={() => router.push("/practice?ai=pending")}
+      onUseAiPartner={() => {
+        matchmaker.cancel();
+        router.push("/practice/ai");
+      }}
     />
   );
 }

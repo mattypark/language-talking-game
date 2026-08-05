@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { Matchmaker } from "./matchmaker.js";
 import { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
-import { pickTopic } from "./topics.js";
+import { TOPICS, pickTopic } from "./topics.js";
 
 /**
  * Matchmaker + WebRTC signaling.
@@ -331,6 +331,17 @@ function sweep() {
 }
 
 const httpServer = createServer((req, res) => {
+  if (req.url === "/topics") {
+    // One source of truth for the topic bank. The app fetches it rather than
+    // keeping a second copy that drifts.
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+    });
+    res.end(JSON.stringify({ topics: TOPICS }));
+    return;
+  }
+
   if (req.url === "/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(
