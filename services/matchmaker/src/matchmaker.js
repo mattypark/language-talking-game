@@ -40,6 +40,15 @@ const DEFAULTS = {
   proposalTimeoutMs: 12_000,
   /** How long a partner stays excluded from re-matching. */
   recentPartnerMs: 24 * 60 * 60 * 1000,
+  /**
+   * Whether a queued profile is still reachable.
+   *
+   * Injected because the queue itself knows nothing about sockets. Without it,
+   * a browser that was killed rather than closed sits in the queue until the
+   * next heartbeat and gets proposed to real users, who then wait out the full
+   * proposal timeout against someone who will never answer.
+   */
+  isEligible: () => true,
 };
 
 function bandDistance(a, b) {
@@ -110,6 +119,12 @@ export class Matchmaker {
     for (const other of this.#entries.values()) {
       if (other.profileId === seeker.profileId) continue;
       if (this.#pendingByProfile.has(other.profileId)) continue;
+
+      // Never propose a partner who is no longer reachable.
+      if (!this.#options.isEligible(other.profileId)) {
+        this.#entries.delete(other.profileId);
+        continue;
+      }
 
       /*
        * Defence in depth. Cohorts are single-age-band by construction, so this

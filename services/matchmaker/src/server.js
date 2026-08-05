@@ -22,12 +22,17 @@ import { pickTopic } from "./topics.js";
 
 const PORT = Number(process.env.PORT ?? 4100);
 const SWEEP_INTERVAL_MS = 2_000;
-const HEARTBEAT_INTERVAL_MS = 30_000;
-
-const matchmaker = new Matchmaker();
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
 /** profileId -> connection state */
 const clients = new Map();
+
+function isConnected(profileId) {
+  const client = clients.get(profileId);
+  return client?.socket.readyState === client?.socket.OPEN;
+}
+
+const matchmaker = new Matchmaker({ isEligible: isConnected });
 /** sessionId -> { profileIds, topicId, startedAt } */
 const sessions = new Map();
 /** profileId -> { proposalId, entry } so a failed proposal can be requeued. */
@@ -35,9 +40,25 @@ const pending = new Map();
 /** profileId -> { partnerProfileId: lastMatchedAt } */
 const recentPartners = new Map();
 
+/**
+ * Set MATCHMAKER_TRACE=1 to log every message in and out.
+ *
+ * Worth keeping: the failure mode this service has is "two people end up in
+ * different states", and that is close to impossible to reason about from
+ * either browser alone.
+ */
+const TRACE = process.env.MATCHMAKER_TRACE === "1";
+
+function trace(direction, profileId, type, extra = "") {
+  if (!TRACE) return;
+  const name = clients.get(profileId)?.profile?.displayName ?? profileId;
+  console.log(`${direction} ${name} ${type} ${extra}`.trim());
+}
+
 function send(profileId, type, payload) {
   const client = clients.get(profileId);
   if (!client || client.socket.readyState !== client.socket.OPEN) return false;
+  trace("->", profileId, type);
   client.socket.send(encode(type, payload));
   return true;
 }
@@ -63,6 +84,31 @@ function queueEntryFor(profile, enqueuedAt) {
 }
 
 function announceProposal(proposal) {
+  /*
+   * Belt and braces alongside the eligibility filter. If a socket dies in the
+   * gap between being chosen and being told, tear the proposal down now rather
+   * than making the other person wait out the full timeout.
+   */
+  const unreachable = proposal.participants.filter(
+    (p) => !isConnected(p.profileId),
+  );
+
+  if (unreachable.length > 0) {
+    matchmaker.cancel(unreachable[0].profileId);
+    for (const participant of proposal.participants) {
+      if (unreachable.includes(participant)) continue;
+      pending.delete(participant.profileId);
+      const client = clients.get(participant.profileId);
+      if (!client?.profile) continue;
+
+      const requeued = matchmaker.enqueue(
+        queueEntryFor(client.profile, participant.enqueuedAt),
+      );
+      if (requeued.status === "proposed") announceProposal(requeued.proposal);
+    }
+    return;
+  }
+
   for (const participant of proposal.participants) {
     const partner = proposal.participants.find(
       (p) => p.profileId !== participant.profileId,
@@ -243,9 +289,23 @@ function handleLeave(client) {
 /** Expired proposals, and anyone who has waited out the whole ladder. */
 function sweep() {
   for (const abandoned of matchmaker.sweep()) {
+    /*
+     * Ghosts go back in the queue too, but at NOW rather than their original
+     * time — not answering costs you your place, which is the whole penalty.
+     *
+     * They have to be requeued rather than dropped: otherwise their screen
+     * says "in the queue" while the server has forgotten them, and they wait
+     * forever on a queue they are not in.
+     */
     for (const ghostId of abandoned.ghosts) {
       pending.delete(ghostId);
       send(ghostId, ServerMessage.REQUEUED, { reason: "you-did-not-answer" });
+
+      const ghost = clients.get(ghostId);
+      if (!ghost?.profile) continue;
+
+      const result = matchmaker.enqueue(queueEntryFor(ghost.profile, Date.now()));
+      if (result.status === "proposed") announceProposal(result.proposal);
     }
 
     for (const survivorId of abandoned.survivors) {
@@ -308,6 +368,10 @@ wss.on("connection", (socket) => {
 
     if (message.type === ClientMessage.HELLO) return handleHello(client, message);
     if (!client.profile) return;
+
+    if (message.type !== ClientMessage.SIGNAL) {
+      trace("<-", client.profileId, message.type);
+    }
 
     switch (message.type) {
       case ClientMessage.ENQUEUE:

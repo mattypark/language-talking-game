@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/account";
 import { Badge } from "@/components/ui/Badge";
@@ -47,14 +48,20 @@ export default async function PracticePage() {
         </dl>
       </Card>
 
+      <Link href="/practice/live" className="mb-4 block">
+        <Button variant="primary" size="lg" isBlock>
+          Find someone to talk to
+        </Button>
+      </Link>
+
       <Card tone="sunken" className="mb-8 p-5">
         <div className="mb-2 flex items-center gap-2">
-          <Badge tone="warn">Next up</Badge>
+          <Badge>How it works</Badge>
         </div>
         <p className="t-body text-ink-muted">
-          The queue and the call are stage three onwards. Everything up to here
-          is real: your profile, your age pool, and the group you can be matched
-          inside.
+          You&rsquo;ll wait a few seconds, meet someone, and get a topic neither
+          of you has seen. Your own side of the call is recorded so it can be
+          scored, and deleted once your report is ready.
         </p>
       </Card>
 

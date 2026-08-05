@@ -86,6 +86,24 @@ describe("pairing", () => {
     assert.equal(result.status, "queued");
   });
 
+  it("drops a candidate who is no longer reachable", () => {
+    const c = clock();
+    const disconnected = new Set();
+    const mm = new Matchmaker({
+      now: c.now,
+      isEligible: (profileId) => !disconnected.has(profileId),
+    });
+
+    mm.enqueue(entry("ghost"));
+    // The browser was killed rather than closed — no close event yet.
+    disconnected.add("ghost");
+
+    const result = mm.enqueue(entry("live-user", { firstLanguage: "Korean" }));
+
+    assert.equal(result.status, "queued", "must not be proposed a dead socket");
+    assert.equal(mm.size, 1, "the ghost is swept out of the queue");
+  });
+
   it("excludes a partner from the last 24 hours", () => {
     const c = clock();
     const mm = new Matchmaker({ now: c.now });
