@@ -25,8 +25,11 @@ export default function HomePage() {
       </p>
 
       <div className="flex flex-wrap gap-3">
+        <Link href="/join">
+          <Button variant="primary">Set yourself up</Button>
+        </Link>
         <Link href="/styleguide">
-          <Button variant="primary">Open the design system</Button>
+          <Button variant="ghost">Design system</Button>
         </Link>
       </div>
     </main>

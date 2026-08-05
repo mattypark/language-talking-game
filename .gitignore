@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# demo-mode store — local development state, never shared
+/.data
+
 # debug
 npm-debug.log*
 yarn-debug.log*
