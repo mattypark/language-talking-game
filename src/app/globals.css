@@ -1,0 +1,161 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/components.css";
+
+/*
+ * Tailwind v4 theme mapping.
+ * Tokens are declared once in tokens.css; this file only exposes them to
+ * Tailwind's utility generator. Never redeclare a value here.
+ */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-press: var(--accent-press);
+  --color-accent-bright: var(--accent-bright);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-tint: var(--accent-tint);
+  --color-on-accent: var(--on-accent);
+
+  --color-live: var(--live);
+  --color-live-tint: var(--live-tint);
+  --color-live-ink: var(--live-ink);
+
+  --color-partner: var(--partner);
+  --color-partner-tint: var(--partner-tint);
+  --color-partner-ink: var(--partner-ink);
+
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-warn-ink: var(--warn-ink);
+
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
+}
+
+/* --------------------------------------------------------------------- base */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body-lh);
+  font-weight: var(--weight-read);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * One focus treatment for the whole product. :focus-visible only, so pointer
+ * users never see it and keyboard users always do. `outline: none` is a ship
+ * blocker — WCAG 2.4.11.
+ */
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+::selection {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+
+/* -------------------------------------------------------------- type roles
+ * Semantic classes rather than loose utilities, so a heading cannot drift to
+ * an off-scale size inside one component.
+ */
+.t-display {
+  font-size: var(--text-display);
+  line-height: var(--text-display-lh);
+  letter-spacing: var(--text-display-ls);
+  font-weight: var(--weight-announce);
+}
+
+.t-title-1 {
+  font-size: var(--text-title-1);
+  line-height: var(--text-title-1-lh);
+  letter-spacing: var(--text-title-1-ls);
+  font-weight: var(--weight-announce);
+}
+
+.t-title-2 {
+  font-size: var(--text-title-2);
+  line-height: var(--text-title-2-lh);
+  letter-spacing: var(--text-title-2-ls);
+  font-weight: var(--weight-announce);
+}
+
+.t-title-3 {
+  font-size: var(--text-title-3);
+  line-height: var(--text-title-3-lh);
+  letter-spacing: var(--text-title-3-ls);
+  font-weight: var(--weight-announce);
+}
+
+.t-body-lg {
+  font-size: var(--text-body-lg);
+  line-height: var(--text-body-lg-lh);
+}
+
+.t-body {
+  font-size: var(--text-body);
+  line-height: var(--text-body-lh);
+}
+
+.t-label {
+  font-size: var(--text-label);
+  line-height: var(--text-label-lh);
+  font-weight: var(--weight-interact);
+}
+
+.t-caption {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-lh);
+}
+
+/* Status pills only. Never as a hero eyebrow — that pairing is a listed tell. */
+.t-micro {
+  font-size: var(--text-micro);
+  line-height: var(--text-micro-lh);
+  letter-spacing: var(--text-micro-ls);
+  font-weight: var(--weight-announce);
+  text-transform: uppercase;
+}
+
+/* Anything that ticks or gets compared reads in tabular numerals. */
+.t-timer,
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.t-timer {
+  font-size: var(--text-timer);
+  line-height: var(--text-timer-lh);
+  font-weight: var(--weight-interact);
+}

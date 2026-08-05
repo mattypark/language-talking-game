@@ -1,0 +1,361 @@
+/*
+ * On Air — primitive component styles
+ * -----------------------------------
+ * Every value here comes from tokens.css. If you find yourself typing a raw
+ * pixel, color, or duration into this file, the token is missing — add it
+ * there instead.
+ *
+ * Motion in this file is limited to the seven allowed motions documented in
+ * README.md. Nothing decorative.
+ */
+
+/* ================================================================== button */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-interact);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+
+  /* Motion 1: state change on a control. */
+  transition:
+    background-color var(--dur-instant) var(--ease-standard),
+    border-color var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* -- sizes. Minimum 44px touch target; in-call controls step up to 56px. -- */
+
+.btn--sm {
+  height: 2.25rem; /* 36 — dense contexts only, never a primary action */
+  padding-inline: var(--space-3);
+}
+
+.btn--md {
+  height: 2.75rem; /* 44 */
+  padding-inline: var(--space-5);
+}
+
+.btn--lg {
+  height: 3.5rem; /* 56 — in-call controls */
+  padding-inline: var(--space-6);
+  font-size: var(--text-body);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* -- variants -- */
+
+/* The one accent element on the screen. If two of these are visible, one is wrong. */
+.btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-press);
+}
+
+.btn--primary:active:not(:disabled) {
+  background: var(--accent-press);
+}
+
+.btn--secondary {
+  background: var(--surface);
+  border-color: var(--hairline);
+  color: var(--ink);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--sunken);
+  border-color: var(--hairline-strong);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+/*
+ * Leave / report / delete. Ghost at rest, filled only on confirm.
+ * A red-filled control sitting next to an orange primary is a real misclick
+ * risk, so the destructive action stays quiet until it is the only option.
+ */
+.btn--danger-ghost {
+  background: transparent;
+  color: var(--danger);
+}
+
+.btn--danger-ghost:hover:not(:disabled) {
+  background: var(--danger-tint);
+}
+
+.btn--danger {
+  background: var(--danger);
+  color: var(--on-accent);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--danger);
+  filter: brightness(0.93);
+}
+
+/* ==================================================================== card */
+
+/*
+ * Cards never carry a shadow at rest. Structure comes from a 1px hairline
+ * plus a step on the surface ladder — the border-first method.
+ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.card--sunken {
+  background: var(--sunken);
+  border-color: transparent;
+}
+
+/*
+ * The topic card is the one element allowed an accent edge, because it is the
+ * visual hero of the call screen — it answers "what do I say," which is the
+ * single biggest failure mode of every peer-practice app.
+ *
+ * Note this is an INSET edge, not a border-left. A thick colored border on one
+ * side of a card is the most-cited AI-slop tell; drawing it inside the radius
+ * as a deliberate accent rail reads as intent instead.
+ */
+.card--topic {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.card--topic::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--accent-bright);
+}
+
+/* =================================================================== badge */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--sunken);
+  color: var(--ink-muted);
+}
+
+.badge--live {
+  background: var(--live-tint);
+  color: var(--live-ink);
+}
+
+.badge--partner {
+  background: var(--partner-tint);
+  color: var(--partner-ink);
+}
+
+.badge--accent {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+
+.badge--warn {
+  background: var(--warn-tint);
+  color: var(--warn-ink);
+}
+
+/* ================================================================ live dot */
+
+/*
+ * The single looping decoration in the product, and it is 6px wide.
+ * It always ships alongside the word LIVE — status is never carried by color
+ * alone (WCAG 1.4.1), which is also why reduced-motion can simply stop it.
+ */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  animation: live-pulse 1.2s var(--ease-standard) infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ================================================================ waveform */
+
+/*
+ * Motion 6: the only continuously moving element in the product, and it earns
+ * that because every frame is real microphone amplitude. Heights are written
+ * directly from the audio callback — there is no easing and no interpolation,
+ * so a silent room renders a flat line rather than a decorative shimmer.
+ */
+.waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.waveform__bar {
+  width: 3px;
+  min-height: 3px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transform-origin: center;
+}
+
+/* =============================================================== score bar */
+
+/*
+ * Motion 5: fills once, on mount, then never moves again.
+ *
+ * Two colour decisions worth defending:
+ *
+ * A weak trait is an UNFILLED track, never a red fill. Red on a learner's own
+ * speech is how you lose the learner, and a short bar already reads as low
+ * without borrowing the destructive colour.
+ *
+ * The fill is ink, not accent. Accent marks the one action on a screen; a
+ * score is data, not an action. Five accent bars next to an accent button
+ * would leave nothing to look at first — and the report screen's job is to end
+ * on "Run it back".
+ */
+.score-bar__track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-strong);
+  overflow: hidden;
+}
+
+.score-bar__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  transition: width var(--dur-reveal) linear;
+}
+
+/* =================================================================== sheet */
+
+.sheet__backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.255 0.014 70 / 0.32);
+  animation: sheet-backdrop-in var(--dur-slow) var(--ease-enter);
+}
+
+.sheet__panel {
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-modal);
+  animation: sheet-panel-in var(--dur-slow) var(--ease-enter);
+}
+
+@keyframes sheet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes sheet-panel-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* ============================================================ entry motion */
+
+/*
+ * Motion 3: new content arriving. Opacity plus at most 8px of Y.
+ * Stagger is capped at three items in the component that uses it — more than
+ * that stops reading as arrival and starts reading as a page-load animation.
+ */
+.enter {
+  animation: enter var(--dur-base) var(--ease-enter) both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

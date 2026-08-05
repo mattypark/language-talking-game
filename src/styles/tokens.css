@@ -1,0 +1,215 @@
+/*
+ * On Air — design tokens
+ * ----------------------
+ * A warm paper-bright studio: one hot accent, one live-green signal light,
+ * hairline structure instead of shadows, motion that only confirms state changes.
+ *
+ * OKLCH is authoritative. Hex in comments is the approximate sRGB fallback and
+ * exists so designers can eyedrop it — it is not used by the stylesheet.
+ *
+ * Rules that ARE the system:
+ *   1. One accent per screen. If two things are Clementine, one of them is wrong.
+ *   2. A neutral canvas carries >=85% of pixels.
+ *   3. Green means live. Blue means partner. Red means destructive. Forever.
+ *   4. No gradients. Single exception: the waveform may ramp chroma within one hue.
+ *   5. Dark mode ships in v1.1 as a real inversion, not a filter.
+ */
+
+:root {
+  /* ---------------------------------------------------------------- neutrals
+   * Warm sand ramp. Tinted toward the accent hue (70deg) so the neutrals and
+   * the accent feel like one family rather than two unrelated palettes.
+   */
+  --canvas: oklch(0.98 0.004 70); /* #FAF9F6 — page background */
+  --surface: oklch(1 0 0); /* #FFFFFF — cards, call panel, sheets */
+  --sunken: oklch(0.96 0.005 70); /* #F3F1ED — wells, transcript area */
+  --hairline: oklch(0.905 0.007 70); /* #E3DFD8 — 1px borders: the primary structure */
+  --hairline-strong: oklch(0.845 0.009 70); /* #CFC9BF — dividers, unfilled score track */
+
+  /*
+   * --ink-subtle clears 3:1 but NOT 4.5:1, so it is never text a user has to
+   * read: disabled controls, decorative rules, and placeholder marks only.
+   * --ink-muted is the lightest ink allowed on real copy.
+   */
+  --ink-subtle: oklch(0.64 0.012 70); /* #8E877C — disabled, decorative */
+  --ink-muted: oklch(0.51 0.014 70); /* #6A6359 — secondary body, smallest readable ink */
+  --ink: oklch(0.255 0.014 70); /* #2A2521 — primary text. Warm near-black, never #000 */
+
+  /* ----------------------------------------------------------------- accent
+   * "Clementine". The single high-chroma hue. Exactly one job per screen:
+   * the primary action.
+   *
+   * Two steps, and the reason is contrast, not decoration. A mid-bright orange
+   * fails 4.5:1 against BOTH white and near-black, so no single value can both
+   * carry a button label and stay vivid. So:
+   *
+   *   --accent         carries text. White on it clears 4.5:1. Buttons only.
+   *   --accent-bright  carries no text, ever. Topic rail, brand mark, waveform.
+   *                    Clears 3:1 against the canvas as a UI component.
+   *
+   * Measured, not estimated — see the contrast audit in the verification notes.
+   */
+  --accent: oklch(0.575 0.17 45); /* #C94A00 — white label at 4.71:1 */
+  --accent-press: oklch(0.51 0.155 43); /* hover / pressed on fill */
+  --accent-bright: oklch(0.645 0.18 45); /* #E16113 — marks and rails, never text */
+  --accent-ink: oklch(0.455 0.145 41); /* #A24118 — accent as TEXT, 7.34:1 on canvas */
+  --accent-tint: oklch(0.955 0.032 55); /* #FDEDE2 — selected row, topic-card wash */
+  --on-accent: oklch(1 0 0); /* #FFFFFF — text on accent fill */
+
+  /* ----------------------------------------------------------------- signal
+   * Semantic only. Never decorative. Never a fourth brand color.
+   * Each of these has exactly one meaning and may not be reused for another.
+   */
+  --live: oklch(0.615 0.15 155); /* #009F59 — connected / on-air / your turn. 3.44:1 on surface */
+  --live-tint: oklch(0.955 0.03 155); /* #E6F6ED — live badge background */
+  --live-ink: oklch(0.44 0.115 155); /* live as TEXT on light */
+
+  --partner: oklch(0.585 0.13 245); /* #3C74C4 — the other person, always */
+  --partner-tint: oklch(0.96 0.025 245); /* their transcript lines, their tile */
+  --partner-ink: oklch(0.45 0.13 245); /* partner as TEXT on light */
+
+  --warn: oklch(0.64 0.14 78); /* #BB7E00 — weak connection, time running out. 3.44:1 on surface */
+  --warn-tint: oklch(0.965 0.03 85);
+  --warn-ink: oklch(0.5 0.115 70);
+
+  --danger: oklch(0.545 0.195 22); /* #C42B33 — destructive / leave / report ONLY */
+  --danger-tint: oklch(0.96 0.025 22);
+
+  /* ------------------------------------------------------------- typography
+   * Switzer: neutral grotesque, slightly humanist terminals. Structured enough
+   * to carry a score report, warm enough to not feel clinical.
+   * Geist Mono, tabular: anything that ticks or gets compared.
+   *
+   * Deliberately NOT: Inter alone (now a tell), Poppins/Montserrat (ubiquity
+   * reads as amateur), any rounded face in body copy (reads as children's
+   * software and undercuts the scorecard's credibility).
+   */
+  /* Both families are injected by next/font in src/app/layout.tsx. */
+  --font-sans:
+    var(--font-switzer), "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Three weights only. 400 read / 500 interact / 600 announce. */
+  --weight-read: 400;
+  --weight-interact: 500;
+  --weight-announce: 600;
+
+  /* Type scale. Letter-spacing scales negatively with size. */
+  --text-display: 2.75rem; /* 44 */
+  --text-display-lh: 1.08;
+  --text-display-ls: -0.022em;
+
+  --text-title-1: 1.875rem; /* 30 */
+  --text-title-1-lh: 1.15;
+  --text-title-1-ls: -0.018em;
+
+  --text-title-2: 1.375rem; /* 22 */
+  --text-title-2-lh: 1.25;
+  --text-title-2-ls: -0.012em;
+
+  --text-title-3: 1.125rem; /* 18 */
+  --text-title-3-lh: 1.35;
+  --text-title-3-ls: -0.006em;
+
+  --text-body-lg: 1.0625rem; /* 17 */
+  --text-body-lg-lh: 1.55;
+
+  --text-body: 0.9375rem; /* 15 */
+  --text-body-lh: 1.55;
+
+  --text-label: 0.875rem; /* 14 */
+  --text-label-lh: 1.3;
+
+  --text-caption: 0.8125rem; /* 13 */
+  --text-caption-lh: 1.4;
+
+  /* Rationed: status pills only. Never a hero eyebrow — that pairing is a tell. */
+  --text-micro: 0.6875rem; /* 11 */
+  --text-micro-lh: 1.3;
+  --text-micro-ls: 0.06em;
+
+  --text-timer: 2.125rem; /* 34, Geist Mono, tabular */
+  --text-timer-lh: 1;
+
+  /* ---------------------------------------------------------------- spacing
+   * 4px base. No arbitrary values anywhere in the product.
+   */
+  --space-0-5: 0.125rem; /* 2 */
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+  --space-10: 2.5rem; /* 40 */
+  --space-14: 3.5rem; /* 56 */
+  --space-18: 4.5rem; /* 72 */
+  --space-24: 6rem; /* 96 */
+
+  /* ----------------------------------------------------------------- radius
+   * Deliberately non-uniform. One radius on everything is itself a tell.
+   * Hard ceiling: nothing above 20px except pills.
+   * Nested radius = parent radius - parent padding.
+   */
+  --radius-xs: 6px; /* badges, chips, tags */
+  --radius-sm: 10px; /* buttons, inputs, select */
+  --radius-md: 14px; /* cards, topic card, score rows */
+  --radius-lg: 20px; /* sheets, modals, the call panel */
+  --radius-full: 9999px; /* avatars, mic button, live dot, skip pill */
+
+  /* ---------------------------------------------------------------- shadows
+   * Exactly two exist. Everything else gets a 1px hairline plus a surface
+   * tint step — the border-first method (Vercel / Linear / Stripe).
+   * Cards at rest never get a shadow.
+   */
+  --shadow-pop:
+    0 1px 2px oklch(0.255 0.014 70 / 0.06), 0 6px 16px oklch(0.255 0.014 70 / 0.07);
+  --shadow-modal: 0 12px 48px oklch(0.255 0.014 70 / 0.16);
+
+  /* ----------------------------------------------------------------- motion
+   * The complete list of what is allowed to move lives in README.md.
+   * If a value here has no entry there, it should not exist.
+   */
+  --dur-instant: 80ms; /* hover tint, press, checkbox */
+  --dur-fast: 140ms; /* focus ring, toggle, tab underline, tooltip */
+  --dur-base: 200ms; /* content enter/exit, chip, transcript line */
+  --dur-slow: 320ms; /* sheet, modal, screen transition */
+  --dur-reveal: 480ms; /* score bar fill — once per session, never looped */
+
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1); /* default for user-initiated */
+  --ease-enter: cubic-bezier(0, 0.4, 0, 1); /* things arriving */
+  --ease-exit: cubic-bezier(0.6, 0, 0.8, 0.6); /* things leaving */
+  --ease-emphasis: cubic-bezier(0.2, 0, 0, 1); /* match-found only */
+
+  /* ------------------------------------------------------------------ focus
+   * Visible everywhere. 2px, 2px offset, >=3:1 against both the component and
+   * whatever sits behind it. `outline: none` is a ship blocker.
+   */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-color: var(--ink);
+}
+
+/*
+ * Reduced motion. Not a courtesy — WCAG 2.3.3.
+ * All transforms collapse to opacity, long durations collapse to short ones,
+ * the live dot stops pulsing (it keeps its "LIVE" text label, which is why the
+ * dot was never the only signal), and the waveform becomes an un-eased meter.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-slow: var(--dur-fast);
+    --dur-reveal: var(--dur-fast);
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: var(--dur-fast) !important;
+    scroll-behavior: auto !important;
+  }
+}
