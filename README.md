@@ -50,7 +50,28 @@ scored on your partner's grammar, which is unrecoverable.
 
 ```bash
 npm install
-npm run dev
+npm run dev                                  # the app, :3000
+cd services/matchmaker && npm install && npm start   # matchmaker, :4100
+```
+
+Both are needed: the app cannot queue or place a call without the
+matchmaker, because a Vercel function cannot hold a WebSocket.
+
+Tests:
+
+```bash
+npm test                     # metrics engine + safety logic
+npm run test:matchmaker      # queue, two-phase confirm, signaling
+```
+
+End-to-end checks drive real browsers and need `npm i -D playwright`:
+
+```bash
+node e2e/onboarding.mjs        # profile, house rules, age-band refusal
+node e2e/two-person-call.mjs   # two browsers, a real peer connection, a report
+node e2e/ai-partner.mjs        # the empty-queue fallback
+node e2e/landing.mjs           # breakpoints and the signature animation
+node scripts/contrast-audit.mjs
 ```
 
 Open `/styleguide` — that's the design system, and it's the fastest way to see
