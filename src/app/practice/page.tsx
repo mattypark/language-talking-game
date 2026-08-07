@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { RoomChooser } from "./RoomChooser";
 import { signOut } from "@/app/actions/account";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -48,11 +48,12 @@ export default async function PracticePage() {
         </dl>
       </Card>
 
-      <Link href="/practice/live" className="mb-4 block">
-        <Button variant="primary" size="lg" isBlock>
-          Find someone to talk to
-        </Button>
-      </Link>
+      <div className="mb-10">
+        <RoomChooser
+          cohortIds={profile.cohortIds}
+          defaultLanguage={profile.targetLanguage}
+        />
+      </div>
 
       <Card tone="sunken" className="mb-8 p-5">
         <div className="mb-2 flex items-center gap-2">
@@ -61,7 +62,7 @@ export default async function PracticePage() {
         <p className="t-body text-ink-muted">
           You&rsquo;ll wait a few seconds, meet someone, and get a topic neither
           of you has seen. Your own side of the call is recorded so it can be
-          scored, and deleted once your report is ready.
+          scored, and deleted a day after your report is ready.
         </p>
       </Card>
 

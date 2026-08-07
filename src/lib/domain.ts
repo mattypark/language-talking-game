@@ -4,17 +4,48 @@
  */
 
 /**
- * v1 is English only, on purpose.
+ * Languages you can practise.
  *
- * Every extra language multiplies the number of matching cells, and a random
- * pairing product dies of thin cells long before it dies of load: 8 languages
- * x 4 levels x 6 timezone blocks is 192 pools, which at 10k daily users is
- * roughly four arrivals per hour per pool. The matchmaker would be fine and
- * the marketplace would be dead.
+ * Every language added multiplies the matching cells, and a random-pairing
+ * product dies of thin cells long before it dies of load. The mitigations that
+ * make this survivable live elsewhere: three level bands rather than six CEFR
+ * levels, adjacent bands matched immediately, "any topic" as the default, and
+ * the AI partner filling any queue that runs dry.
+ *
+ * English is first because it is the only pool likely to be thick at launch.
+ * The others are real, and honest about being quiet.
  */
-export const TARGET_LANGUAGES = [{ code: "en", label: "English" }] as const;
+export const TARGET_LANGUAGES = [
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "es", label: "Spanish", nativeLabel: "Español" },
+  { code: "fr", label: "French", nativeLabel: "Français" },
+  { code: "ja", label: "Japanese", nativeLabel: "日本語" },
+  { code: "ko", label: "Korean", nativeLabel: "한국어" },
+  { code: "zh", label: "Mandarin", nativeLabel: "中文" },
+] as const;
 
 export type TargetLanguageCode = (typeof TARGET_LANGUAGES)[number]["code"];
+
+export function isTargetLanguage(value: unknown): value is TargetLanguageCode {
+  return TARGET_LANGUAGES.some((language) => language.code === value);
+}
+
+export function languageLabel(code: string): string {
+  return TARGET_LANGUAGES.find((l) => l.code === code)?.label ?? code;
+}
+
+/**
+ * The room you can join without narrowing the pool.
+ *
+ * Default on purpose. A named topic room feels alive, but every one of them
+ * halves the people you can be matched with — so the one that costs nothing is
+ * the one selected for you, and choosing a specific room widens back to this
+ * automatically after a short wait.
+ */
+export const ANY_TOPIC = "any";
+
+/** How long a specific topic room waits before widening to the whole pool. */
+export const TOPIC_WIDEN_AFTER_MS = 20_000;
 
 /**
  * Three bands, not six CEFR levels — same cell-collapse reasoning. Adjacent

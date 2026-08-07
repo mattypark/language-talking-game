@@ -27,7 +27,7 @@ export default function HomePage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/join">
               <Button variant="primary" size="lg">
-                Start practising
+                Join a room
               </Button>
             </Link>
             <Link href="/styleguide">
@@ -97,8 +97,9 @@ export default function HomePage() {
                 scored. Your partner is told exactly the same thing.
               </p>
               <p className="t-body">
-                It is deleted a day after your report is ready. Audio is
-                audio-only — there is no video here, and there will not be.
+                It is deleted a day after your report is ready. Calls always
+                start as voice only; cameras turn on mid-call only if both of
+                you agree, and either of you can turn them off again.
               </p>
               <p className="t-body">
                 Under-18s and adults are never put in the same matching pool.
@@ -112,7 +113,7 @@ export default function HomePage() {
           <h2 className="t-title-1 mb-6">Say something out loud today.</h2>
           <Link href="/join">
             <Button variant="primary" size="lg">
-              Start practising
+              Join a room
             </Button>
           </Link>
         </section>

@@ -19,6 +19,9 @@ type Props = {
   profile: QueueProfile;
   matchmakerUrl: string;
   stunUrls: string[];
+  /** What they chose on the room screen. */
+  language: string;
+  topicId: string;
 };
 
 const COUNTDOWN_SECONDS = 3;
@@ -30,7 +33,13 @@ const COUNTDOWN_SECONDS = 3;
  * would tear down the WebSocket at precisely the moment it is carrying the
  * WebRTC negotiation.
  */
-export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
+export function LiveSession({
+  profile,
+  matchmakerUrl,
+  stunUrls,
+  language,
+  topicId,
+}: Props) {
   const router = useRouter();
   const mic = useMicLevels({ bars: 5 });
   const recorder = useOwnMicRecorder();
@@ -100,10 +109,10 @@ export function LiveSession({ profile, matchmakerUrl, stunUrls }: Props) {
   const { phase } = matchmaker.state;
   const { enqueue } = matchmaker;
 
-  /** Join the queue as soon as the socket is up. */
+  /** Join the queue as soon as the socket is up, in the room they chose. */
   useEffect(() => {
-    if (phase === "idle" && !isCallOpen) enqueue();
-  }, [phase, isCallOpen, enqueue]);
+    if (phase === "idle" && !isCallOpen) enqueue({ language, topicId });
+  }, [phase, isCallOpen, enqueue, language, topicId]);
 
   /** Countdown for the call itself. */
   useEffect(() => {

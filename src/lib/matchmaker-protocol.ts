@@ -32,7 +32,12 @@ export type PartnerSummary = {
 
 export type ServerEvent =
   | { type: "ready"; profileId: string }
-  | { type: "queued"; waitingSince: number; othersWaiting: number }
+  | {
+      type: "queued";
+      waitingSince: number;
+      othersWaiting: number;
+      rooms?: Record<string, number>;
+    }
   | {
       type: "proposed";
       proposalId: string;
@@ -54,7 +59,7 @@ export type ServerEvent =
 
 export type ClientEvent =
   | { type: "hello"; profile: QueueProfile }
-  | { type: "enqueue" }
+  | { type: "enqueue"; language: string; topicId: string }
   | { type: "ack"; proposalId: string }
   | { type: "cancel" }
   | { type: "signal"; payload: unknown }

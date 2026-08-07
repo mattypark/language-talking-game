@@ -22,6 +22,7 @@ export type MatchmakerState = {
   phase: MatchmakerPhase;
   waitingSince: number | null;
   othersWaiting: number;
+  rooms: Record<string, number>;
   proposalId: string | null;
   partner: PartnerSummary | null;
   sessionId: string | null;
@@ -36,6 +37,7 @@ const INITIAL: MatchmakerState = {
   phase: "connecting",
   waitingSince: null,
   othersWaiting: 0,
+  rooms: {},
   proposalId: null,
   partner: null,
   sessionId: null,
@@ -100,6 +102,7 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
           phase: "queued",
           waitingSince: event.waitingSince,
           othersWaiting: event.othersWaiting,
+          rooms: event.rooms ?? {},
           proposalId: null,
           partner: null,
         }));
@@ -212,7 +215,11 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
     };
   }, [url, profile, handleEvent]);
 
-  const enqueue = useCallback(() => send({ type: "enqueue" }), [send]);
+  const enqueue = useCallback(
+    (choice: { language: string; topicId: string }) =>
+      send({ type: "enqueue", ...choice }),
+    [send],
+  );
   const cancel = useCallback(() => {
     setState((s) => ({ ...s, phase: "idle", isAiOffered: false }));
     return send({ type: "cancel" });

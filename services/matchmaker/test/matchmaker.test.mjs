@@ -128,6 +128,91 @@ describe("pairing", () => {
   });
 });
 
+describe("language and topic rooms", () => {
+  it("never matches across languages, however long anyone waits", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now });
+
+    mm.enqueue(entry("english", { language: "en" }));
+    c.advance(120_000);
+    const result = mm.enqueue(
+      entry("spanish", { language: "es", enqueuedAt: c.now() - 120_000 }),
+    );
+
+    assert.equal(result.status, "queued", "there is no conversation to have");
+  });
+
+  it("matches anyone when both are in the any-topic room", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now });
+
+    mm.enqueue(entry("a"));
+    assert.equal(mm.enqueue(entry("b")).status, "proposed");
+  });
+
+  it("holds a named room briefly, then widens to the whole pool", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now });
+
+    mm.enqueue(entry("food-room", { topicId: "food-home" }));
+    const early = mm.enqueue(entry("money-room", { topicId: "money-or-time" }));
+    assert.equal(early.status, "queued", "different rooms do not meet at once");
+
+    const c2 = clock();
+    const mm2 = new Matchmaker({ now: c2.now });
+    mm2.enqueue(entry("waited", { topicId: "food-home" }));
+    c2.advance(21_000);
+    const late = mm2.enqueue(
+      entry("other", { topicId: "money-or-time", enqueuedAt: c2.now() }),
+    );
+    assert.equal(late.status, "proposed", "a room is a preference, not a wall");
+  });
+
+  it("pairs a named room with someone who asked for any topic", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now });
+
+    mm.enqueue(entry("specific", { topicId: "food-home" }));
+    assert.equal(mm.enqueue(entry("flexible")).status, "proposed");
+  });
+
+  it("prefers the room you asked for over one you did not", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now, recentPartnerMs: Infinity });
+
+    mm.enqueue(entry("in-any-room", { topicId: "any" }));
+    mm.enqueue(
+      entry("in-my-room", {
+        topicId: "food-home",
+        recentPartners: { "in-any-room": Date.now() },
+      }),
+    );
+
+    const result = mm.enqueue(entry("seeker", { topicId: "food-home" }));
+    const partner = result.proposal.participants.find(
+      (p) => p.profileId !== "seeker",
+    );
+    assert.equal(partner.profileId, "in-my-room");
+  });
+
+  it("counts who is waiting in each room, per language", () => {
+    const c = clock();
+    const mm = new Matchmaker({ now: c.now, recentPartnerMs: Infinity });
+
+    // All mutually excluded so they stay in the queue to be counted.
+    const seen = { a: Date.now(), b: Date.now(), c: Date.now() };
+    mm.enqueue(entry("a", { topicId: "food-home", recentPartners: seen }));
+    mm.enqueue(entry("b", { topicId: "food-home", recentPartners: seen }));
+    mm.enqueue(entry("c", { topicId: "one-rule", recentPartners: seen }));
+    mm.enqueue(entry("d", { language: "es", recentPartners: seen }));
+
+    const counts = mm.roomCounts(["cohort-a"], "en");
+    assert.equal(counts["food-home"], 2);
+    assert.equal(counts["one-rule"], 1);
+    assert.equal(counts["any"], undefined, "nobody chose the any room here");
+  });
+});
+
 describe("widening ladder", () => {
   it("pairs an adjacent band straight away", () => {
     const c = clock();

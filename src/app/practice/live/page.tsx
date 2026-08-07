@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
 import { LiveSession } from "@/components/live/LiveSession";
 import { getCurrentProfile, nextOnboardingStep } from "@/lib/auth";
+import { ANY_TOPIC, isTargetLanguage } from "@/lib/domain";
 
 export const metadata = { title: "Practising · On Air" };
 
 const DEFAULT_MATCHMAKER_URL = "ws://localhost:4100";
 const DEFAULT_STUN = "stun:stun.cloudflare.com:3478";
 
-export default async function LivePage() {
+export default async function LivePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ language?: string; topic?: string }>;
+}) {
+  const { language, topic } = await searchParams;
   const profile = await getCurrentProfile();
   const step = nextOnboardingStep(profile);
   if (step) redirect(step);
@@ -43,6 +49,8 @@ export default async function LivePage() {
         }}
         matchmakerUrl={matchmakerUrl}
         stunUrls={stunUrls}
+        language={isTargetLanguage(language) ? language : profile.targetLanguage}
+        topicId={typeof topic === "string" && topic.length > 0 ? topic : ANY_TOPIC}
       />
     </main>
   );

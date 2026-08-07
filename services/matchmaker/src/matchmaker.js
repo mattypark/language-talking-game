@@ -33,6 +33,19 @@ export const TIERS = [
   { afterMs: 75_000, scope: "ai-partner" },
 ];
 
+/** The room that matches across every other room. */
+export const ANY_TOPIC = "any";
+
+/**
+ * How long a named topic room holds out before matching across all of them.
+ *
+ * Topic rooms make a queue feel alive and cost liquidity — every room halves
+ * the people you can meet. Widening automatically is what stops that being a
+ * trap: you get the room you asked for if anyone is there, and the whole pool
+ * if they are not.
+ */
+const TOPIC_WIDEN_AFTER_MS = 20_000;
+
 const BAND_ORDER = ["beginner", "intermediate", "advanced"];
 
 const DEFAULTS = {
@@ -53,6 +66,23 @@ const DEFAULTS = {
 
 function bandDistance(a, b) {
   return Math.abs(BAND_ORDER.indexOf(a) - BAND_ORDER.indexOf(b));
+}
+
+/**
+ * Whether two people's chosen rooms can meet.
+ *
+ * ANY_TOPIC matches everything. Two different named rooms only meet once at
+ * least one of them has waited out the widening window — so a named room is a
+ * preference with a deadline, not a wall.
+ */
+function topicsCompatible(a, b, now) {
+  if (a.topicId === ANY_TOPIC || b.topicId === ANY_TOPIC) return true;
+  if (a.topicId === b.topicId) return true;
+
+  const widened =
+    now - a.enqueuedAt >= TOPIC_WIDEN_AFTER_MS ||
+    now - b.enqueuedAt >= TOPIC_WIDEN_AFTER_MS;
+  return widened;
 }
 
 function tierFor(waitedMs) {
@@ -96,6 +126,10 @@ export class Matchmaker {
       band: entry.band,
       ageBand: entry.ageBand,
       firstLanguage: entry.firstLanguage,
+      /** What they are practising. Never crossed — a hard part of the key. */
+      language: entry.language ?? "en",
+      /** The room they asked for, or ANY_TOPIC. */
+      topicId: entry.topicId ?? ANY_TOPIC,
       recentPartners: entry.recentPartners ?? {},
       // Preserved across a failed proposal so a ghosted user does not lose
       // their place in line.
@@ -143,11 +177,25 @@ export class Matchmaker {
         continue;
       }
 
+      /*
+       * Language is never crossed. Two people practising different languages
+       * have no conversation to have, so unlike level or topic this one never
+       * widens.
+       */
+      if (other.language !== seeker.language) continue;
+
+      if (!topicsCompatible(seeker, other, now)) continue;
+
       const distance = bandDistance(seeker.band, other.band);
       if (scope === "adjacent-band" && distance > 1) continue;
       // "any-band" and "any-cohort" accept any distance within a shared cohort.
 
-      candidates.push({ other, distance, cohortId: sharedCohorts[0] });
+      candidates.push({
+        other,
+        distance,
+        cohortId: sharedCohorts[0],
+        isSameTopic: other.topicId === seeker.topicId,
+      });
     }
 
     if (candidates.length === 0) return null;
@@ -163,6 +211,9 @@ export class Matchmaker {
      *     queue can starve someone indefinitely.
      */
     candidates.sort((a, b) => {
+      // The room they asked for wins, when someone is in it.
+      if (a.isSameTopic !== b.isSameTopic) return a.isSameTopic ? -1 : 1;
+
       const aSameL1 = a.other.firstLanguage === seeker.firstLanguage ? 1 : 0;
       const bSameL1 = b.other.firstLanguage === seeker.firstLanguage ? 1 : 0;
       if (aSameL1 !== bSameL1) return aSameL1 - bSameL1;
@@ -302,6 +353,20 @@ export class Matchmaker {
     return [...this.#entries.values()].filter((entry) =>
       entry.cohortIds.some((id) => cohortIds.includes(id)),
     ).length;
+  }
+
+  /**
+   * Live counts per room, for the room list. Real numbers or none — a
+   * fabricated "24 waiting" is a lie users eventually catch.
+   */
+  roomCounts(cohortIds, language) {
+    const counts = new Map();
+    for (const entry of this.#entries.values()) {
+      if (entry.language !== language) continue;
+      if (!entry.cohortIds.some((id) => cohortIds.includes(id))) continue;
+      counts.set(entry.topicId, (counts.get(entry.topicId) ?? 0) + 1);
+    }
+    return Object.fromEntries(counts);
   }
 
   waitingSince(profileId) {

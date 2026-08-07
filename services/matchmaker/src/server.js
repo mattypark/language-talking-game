@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { Matchmaker } from "./matchmaker.js";
 import { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
-import { TOPICS, pickTopic } from "./topics.js";
+import { TOPICS, getTopic, pickTopic } from "./topics.js";
 
 /**
  * Matchmaker + WebRTC signaling.
@@ -71,17 +71,22 @@ function partnerOf(profileId) {
   return session.profileIds.find((id) => id !== profileId) ?? null;
 }
 
-function queueEntryFor(profile, enqueuedAt) {
+function queueEntryFor(profile, enqueuedAt, choice = {}) {
   return {
     profileId: profile.id,
     cohortIds: profile.cohortIds,
     band: profile.levelBand,
     ageBand: profile.ageBand,
     firstLanguage: profile.firstLanguage,
+    language: choice.language ?? profile.targetLanguage ?? "en",
+    topicId: choice.topicId ?? "any",
     recentPartners: Object.fromEntries(recentPartners.get(profile.id) ?? []),
     enqueuedAt,
   };
 }
+
+/** What someone last asked for, so a requeue keeps their room and language. */
+const lastChoice = new Map();
 
 function announceProposal(proposal) {
   /*
@@ -102,7 +107,11 @@ function announceProposal(proposal) {
       if (!client?.profile) continue;
 
       const requeued = matchmaker.enqueue(
-        queueEntryFor(client.profile, participant.enqueuedAt),
+        queueEntryFor(
+          client.profile,
+          participant.enqueuedAt,
+          lastChoice.get(participant.profileId),
+        ),
       );
       if (requeued.status === "proposed") announceProposal(requeued.proposal);
     }
@@ -130,7 +139,19 @@ function announceProposal(proposal) {
 
 function confirmMatch(proposal) {
   const [first, second] = proposal.participants;
-  const topic = pickTopic(proposal.sessionId);
+
+  /*
+   * If both asked for the same named room, they get that topic. Otherwise it
+   * is drawn from the session id — still after matching, still revealed to
+   * both at once, so there is nothing to prepare.
+   */
+  const firstChoice = lastChoice.get(first.profileId)?.topicId;
+  const secondChoice = lastChoice.get(second.profileId)?.topicId;
+  const agreed =
+    firstChoice && firstChoice !== "any" && firstChoice === secondChoice
+      ? getTopic(firstChoice)
+      : null;
+  const topic = agreed ?? pickTopic(proposal.sessionId);
 
   sessions.set(proposal.sessionId, {
     profileIds: [first.profileId, second.profileId],
@@ -215,10 +236,16 @@ function handleHello(client, message) {
   send(profile.id, ServerMessage.READY, { profileId: profile.id });
 }
 
-function handleEnqueue(client) {
+function handleEnqueue(client, message = {}) {
   if (!client.profile) return;
 
-  const entry = queueEntryFor(client.profile, Date.now());
+  const choice = {
+    language: typeof message.language === "string" ? message.language : undefined,
+    topicId: typeof message.topicId === "string" ? message.topicId : undefined,
+  };
+  lastChoice.set(client.profileId, choice);
+
+  const entry = queueEntryFor(client.profile, Date.now(), choice);
   const result = matchmaker.enqueue(entry);
 
   if (result.status === "proposed") {
@@ -231,6 +258,10 @@ function handleEnqueue(client) {
     othersWaiting: Math.max(
       0,
       matchmaker.waitingCount(client.profile.cohortIds) - 1,
+    ),
+    rooms: matchmaker.roomCounts(
+      client.profile.cohortIds,
+      choice.language ?? client.profile.targetLanguage ?? "en",
     ),
   });
 }
@@ -256,7 +287,11 @@ function handleCancel(client) {
       if (!stranded?.profile) continue;
 
       const requeued = matchmaker.enqueue(
-        queueEntryFor(stranded.profile, matchmaker.waitingSince(strandedId) ?? Date.now()),
+        queueEntryFor(
+          stranded.profile,
+          matchmaker.waitingSince(strandedId) ?? Date.now(),
+          lastChoice.get(strandedId),
+        ),
       );
       send(strandedId, ServerMessage.REQUEUED, { reason: "partner-declined" });
       if (requeued.status === "proposed") announceProposal(requeued.proposal);
@@ -304,7 +339,9 @@ function sweep() {
       const ghost = clients.get(ghostId);
       if (!ghost?.profile) continue;
 
-      const result = matchmaker.enqueue(queueEntryFor(ghost.profile, Date.now()));
+      const result = matchmaker.enqueue(
+        queueEntryFor(ghost.profile, Date.now(), lastChoice.get(ghostId)),
+      );
       if (result.status === "proposed") announceProposal(result.proposal);
     }
 
@@ -317,7 +354,7 @@ function sweep() {
       const original =
         matchmaker.waitingSince(survivorId) ?? Date.now() - 12_000;
       const result = matchmaker.enqueue(
-        queueEntryFor(survivor.profile, original),
+        queueEntryFor(survivor.profile, original, lastChoice.get(survivorId)),
       );
 
       send(survivorId, ServerMessage.REQUEUED, { reason: "partner-vanished" });
@@ -339,6 +376,27 @@ const httpServer = createServer((req, res) => {
       "access-control-allow-origin": "*",
     });
     res.end(JSON.stringify({ topics: TOPICS }));
+    return;
+  }
+
+  if (req.url?.startsWith("/rooms")) {
+    // Live counts for the room list. Real numbers or none.
+    const url = new URL(req.url, "http://localhost");
+    const cohortIds = (url.searchParams.get("cohorts") ?? "")
+      .split(",")
+      .filter(Boolean);
+    const language = url.searchParams.get("language") ?? "en";
+
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+    });
+    res.end(
+      JSON.stringify({
+        rooms: matchmaker.roomCounts(cohortIds, language),
+        waiting: matchmaker.waitingCount(cohortIds),
+      }),
+    );
     return;
   }
 
@@ -386,7 +444,7 @@ wss.on("connection", (socket) => {
 
     switch (message.type) {
       case ClientMessage.ENQUEUE:
-        return handleEnqueue(client);
+        return handleEnqueue(client, message);
       case ClientMessage.ACK:
         return handleAck(client, message);
       case ClientMessage.CANCEL:
