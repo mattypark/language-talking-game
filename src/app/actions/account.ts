@@ -6,6 +6,7 @@ import {
   COMMON_FIRST_LANGUAGES,
   isAgeBandId,
   isLevelBandId,
+  isTargetLanguage,
   TARGET_LANGUAGES,
 } from "@/lib/domain";
 import {
@@ -59,9 +60,14 @@ export async function createAccount(
       ? firstLanguageRaw
       : "Other";
 
+  const targetLanguageRaw = formData.get("targetLanguage");
+  const targetLanguage = isTargetLanguage(targetLanguageRaw)
+    ? targetLanguageRaw
+    : TARGET_LANGUAGES[0].code;
+
   const profile = await createProfile({
     displayName: name,
-    targetLanguage: TARGET_LANGUAGES[0].code,
+    targetLanguage,
     levelBand,
     firstLanguage,
     ageBand,

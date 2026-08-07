@@ -184,9 +184,18 @@
   pointer-events: none;
 }
 
-.choice:has(.choice__input:checked) {
+.choice:has(.choice__input:checked),
+.choice--selected {
   background: var(--accent-tint);
   border-color: var(--accent-bright);
+}
+
+/*
+ * Selection is carried by border AND fill, not by colour alone — the same rule
+ * the call screen follows, and the reason this survives grayscale.
+ */
+.choice--selected {
+  box-shadow: inset 0 0 0 1px var(--accent-bright);
 }
 
 .choice:has(.choice__input:focus-visible) {

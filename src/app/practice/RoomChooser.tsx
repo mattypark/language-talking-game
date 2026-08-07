@@ -185,7 +185,12 @@ function RoomRow({
   onSelect: () => void;
 }) {
   return (
-    <button type="button" onClick={onSelect} className="choice w-full text-left">
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={isSelected}
+      className={cn("choice w-full text-left", isSelected && "choice--selected")}
+    >
       <span className="flex items-baseline justify-between gap-3">
         <span className="t-label">{title}</span>
         {/* A real number or nothing. A fabricated count is a lie users catch. */}

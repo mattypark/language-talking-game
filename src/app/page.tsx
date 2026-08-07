@@ -25,7 +25,7 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/join">
+            <Link href="/welcome">
               <Button variant="primary" size="lg">
                 Join a room
               </Button>
@@ -111,7 +111,7 @@ export default function HomePage() {
 
         <section className="border-t border-hairline py-16">
           <h2 className="t-title-1 mb-6">Say something out loud today.</h2>
-          <Link href="/join">
+          <Link href="/welcome">
             <Button variant="primary" size="lg">
               Join a room
             </Button>
