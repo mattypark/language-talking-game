@@ -14,6 +14,11 @@ import { useOwnMicRecorder } from "@/hooks/useOwnMicRecorder";
 import { useWebRtcAudio } from "@/hooks/useWebRtcAudio";
 import { SESSION_SECONDS } from "@/lib/domain";
 import type { QueueProfile } from "@/lib/matchmaker-protocol";
+import {
+  isVideoControl,
+  type VideoControl,
+  type VideoState,
+} from "@/lib/video-handshake";
 
 type Props = {
   profile: QueueProfile;
@@ -48,6 +53,7 @@ export function LiveSession({
   const [isMuted, setIsMuted] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [didPartnerLeave, setDidPartnerLeave] = useState(false);
+  const [videoState, setVideoState] = useState<VideoState>("off");
   const [secondsRemaining, setSecondsRemaining] = useState(SESSION_SECONDS);
 
   const iceServers = useMemo<RTCIceServer[]>(
@@ -56,6 +62,7 @@ export function LiveSession({
   );
 
   const receiveSignalRef = useRef<((payload: unknown) => void) | null>(null);
+  const videoControlRef = useRef<((control: VideoControl) => void) | null>(null);
 
   /*
    * "peer-left" clears the session id from matchmaker state, but the upload
@@ -64,7 +71,15 @@ export function LiveSession({
    */
   const lastSessionIdRef = useRef<string | null>(null);
 
+  /**
+   * Camera controls ride the same relay as the WebRTC signals, so they are
+   * separated here before anything reaches the peer connection.
+   */
   const handleSignal = useCallback((payload: unknown) => {
+    if (isVideoControl(payload)) {
+      videoControlRef.current?.(payload);
+      return;
+    }
     receiveSignalRef.current?.(payload);
   }, []);
 
@@ -181,6 +196,85 @@ export function LiveSession({
     return () => clearTimeout(timer);
   }, [isCallOpen, secondsRemaining, endCall]);
 
+  /* ------------------------------------------------------------ camera --- */
+
+  const startVideo = useCallback(async () => {
+    const ok = await webrtc.enableVideo();
+    if (!ok) {
+      setVideoState("off");
+      return;
+    }
+    setVideoState("on");
+
+    // Only the offerer may re-offer; the other side has to ask for it.
+    if (matchmaker.state.isOfferer) {
+      await webrtc.renegotiate();
+    } else {
+      matchmaker.signal({ kind: "video-renegotiate" });
+    }
+  }, [webrtc, matchmaker]);
+
+  const stopVideo = useCallback(
+    (shouldTell = true) => {
+      webrtc.disableVideo();
+      setVideoState("off");
+      if (shouldTell) matchmaker.signal({ kind: "video-stop" });
+
+      if (matchmaker.state.isOfferer) {
+        void webrtc.renegotiate();
+      } else {
+        matchmaker.signal({ kind: "video-renegotiate" });
+      }
+    },
+    [webrtc, matchmaker],
+  );
+
+  /** Their side of the handshake. */
+  const handleVideoControl = useCallback(
+    (control: VideoControl) => {
+      switch (control.kind) {
+        case "video-request":
+          // Only surfaces a prompt. Nothing turns on without an answer.
+          setVideoState((current) => (current === "on" ? current : "invited"));
+          return;
+        case "video-accept":
+          void startVideo();
+          return;
+        case "video-decline":
+          setVideoState("off");
+          return;
+        case "video-stop":
+          // They dropped their camera; ours stays exactly as it was.
+          return;
+        case "video-renegotiate":
+          if (matchmaker.state.isOfferer) void webrtc.renegotiate();
+          return;
+        default:
+          return;
+      }
+    },
+    [startVideo, webrtc, matchmaker.state.isOfferer],
+  );
+
+  useEffect(() => {
+    videoControlRef.current = handleVideoControl;
+  }, [handleVideoControl]);
+
+  const askForVideo = useCallback(() => {
+    setVideoState("asked");
+    matchmaker.signal({ kind: "video-request" });
+  }, [matchmaker]);
+
+  const acceptVideo = useCallback(() => {
+    matchmaker.signal({ kind: "video-accept" });
+    void startVideo();
+  }, [matchmaker, startVideo]);
+
+  const declineVideo = useCallback(() => {
+    setVideoState("off");
+    matchmaker.signal({ kind: "video-decline" });
+  }, [matchmaker]);
+
   /** Report and hang up in one move. The call must stop, then be explained. */
   const handleReport = useCallback(
     (reason: string) => {
@@ -282,6 +376,13 @@ export function LiveSession({
         onToggleMute={handleToggleMute}
         onLeave={() => void endCall()}
         onReport={handleReport}
+        videoState={videoState}
+        localVideo={webrtc.localVideo}
+        hasRemoteVideo={webrtc.hasRemoteVideo}
+        onAskForVideo={askForVideo}
+        onAcceptVideo={acceptVideo}
+        onDeclineVideo={declineVideo}
+        onStopVideo={() => stopVideo()}
       />
     );
   }

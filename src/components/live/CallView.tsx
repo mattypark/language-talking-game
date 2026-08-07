@@ -13,6 +13,7 @@ import type { CallStatus } from "@/hooks/useWebRtcAudio";
 import { cn } from "@/lib/cn";
 import { isSpeaking } from "@/lib/level-meter";
 import type { PartnerSummary, Topic } from "@/lib/matchmaker-protocol";
+import type { VideoState } from "@/lib/video-handshake";
 
 type Props = {
   topic: Topic;
@@ -27,6 +28,13 @@ type Props = {
   onToggleMute: () => void;
   onLeave: () => void;
   onReport: (reason: string) => void;
+  videoState: VideoState;
+  localVideo: MediaStream | null;
+  hasRemoteVideo: boolean;
+  onAskForVideo: () => void;
+  onAcceptVideo: () => void;
+  onDeclineVideo: () => void;
+  onStopVideo: () => void;
 };
 
 const WARNING_SECONDS = 30;
@@ -44,6 +52,13 @@ export function CallView({
   onToggleMute,
   onLeave,
   onReport,
+  videoState,
+  localVideo,
+  hasRemoteVideo,
+  onAskForVideo,
+  onAcceptVideo,
+  onDeclineVideo,
+  onStopVideo,
 }: Props) {
   const remoteLevels = useStreamLevels(remoteStream);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -100,6 +115,17 @@ export function CallView({
         </ul>
       </Card>
 
+      {/*
+        Cameras only appear once both people agreed. Until then this is a voice
+        call and looks like one.
+      */}
+      {videoState === "on" ? (
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <VideoTile stream={remoteStream} isLive={hasRemoteVideo} label={partner.displayName} tone="partner" />
+          <VideoTile stream={localVideo} isLive={localVideo !== null} label="You" tone="you" isMuted />
+        </div>
+      ) : null}
+
       <div className="mb-6 space-y-3">
         <SpeakerTile
           name={partner.displayName}
@@ -142,6 +168,21 @@ export function CallView({
           next to an orange primary is a genuine misclick risk, and misclicking
           this one ends the session for both people.
         */}
+        {videoState === "on" ? (
+          <Button variant="secondary" size="lg" onClick={onStopVideo}>
+            Stop video
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={onAskForVideo}
+            disabled={videoState === "asked"}
+          >
+            {videoState === "asked" ? "Asked…" : "Video"}
+          </Button>
+        )}
+
         <Button
           variant="ghost"
           size="lg"
@@ -166,6 +207,29 @@ export function CallView({
           </Button>
         )}
       </div>
+
+      {/*
+        Their request to turn cameras on. Nothing happens without an answer,
+        and declining is a single tap that does not end the conversation.
+      */}
+      <Sheet
+        isOpen={videoState === "invited"}
+        onClose={onDeclineVideo}
+        title={`${partner.displayName} wants to turn cameras on`}
+      >
+        <p className="t-body mb-5 text-ink-muted">
+          You&rsquo;d both be on camera. You can turn yours off again at any
+          point, on your own, without asking.
+        </p>
+        <div className="flex gap-3">
+          <Button variant="primary" onClick={onAcceptVideo}>
+            Turn my camera on
+          </Button>
+          <Button variant="ghost" onClick={onDeclineVideo}>
+            Stay on voice
+          </Button>
+        </div>
+      </Sheet>
 
       {/*
         Reporting ends the call on the spot. Nobody being harassed should have
@@ -208,6 +272,59 @@ const REPORT_REASONS = [
   { id: "not-practising", label: "Not here to practise" },
   { id: "safety-concern", label: "I'm worried about their safety" },
 ];
+
+/**
+ * A camera tile. Local video is mirrored and muted — hearing yourself is
+ * unusable, and an unmirrored self-view reads as someone else's face.
+ */
+function VideoTile({
+  stream,
+  isLive,
+  label,
+  tone,
+  isMuted = false,
+}: {
+  stream: MediaStream | null;
+  isLive: boolean;
+  label: string;
+  tone: "you" | "partner";
+  isMuted?: boolean;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (ref.current && stream) ref.current.srcObject = stream;
+  }, [stream]);
+
+  return (
+    <div
+      className={cn(
+        "relative aspect-[4/3] overflow-hidden rounded-md border bg-sunken",
+        tone === "partner" ? "border-partner" : "border-accent-bright",
+      )}
+    >
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        muted={isMuted}
+        className={cn(
+          "h-full w-full object-cover",
+          isMuted && "[transform:scaleX(-1)]",
+          !isLive && "opacity-0",
+        )}
+      />
+      {!isLive ? (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="t-caption text-ink-muted">Camera off</span>
+        </span>
+      ) : null}
+      <span className="absolute bottom-2 left-2 rounded-xs bg-surface/90 px-2 py-1">
+        <span className="t-micro">{label}</span>
+      </span>
+    </div>
+  );
+}
 
 function connectionLabel(status: CallStatus): string {
   switch (status) {

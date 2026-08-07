@@ -41,6 +41,32 @@ const pending = new Map();
 const recentPartners = new Map();
 
 /**
+ * Sockets that dropped while in a call, held briefly in case they come back.
+ *
+ * profileId -> { timer, sessionId }
+ *
+ * A closed socket is not the same as someone hanging up. Wifi hiccups, a
+ * browser tab throttles, a reconnect swaps one socket for another — in every
+ * case the person is still there, and ending their partner's call is both
+ * wrong and unrecoverable. So a disconnect during a call starts a short clock
+ * instead, and saying hello again inside that window puts them straight back.
+ */
+const reconnectGrace = new Map();
+
+const RECONNECT_GRACE_MS = 6_000;
+
+/**
+ * Monotonic per-connection sequence.
+ *
+ * Two sockets from the same profile can say hello in either order — the older
+ * one's hello can easily land second. Registering blindly then lets the older
+ * socket own the registry, and when it closes moments later the live one is
+ * evicted and its partner is told the call ended. Sequencing makes arrival
+ * order irrelevant.
+ */
+let connectionSequence = 0;
+
+/**
  * Set MATCHMAKER_TRACE=1 to log every message in and out.
  *
  * Worth keeping: the failure mode this service has is "two people end up in
@@ -229,9 +255,33 @@ function handleHello(client, message) {
    * Everything downstream — the age-band separation above all — is only as
    * trustworthy as this line, and right now it is not trustworthy at all.
    */
+  const existing = clients.get(profile.id);
+  if (existing && existing !== client && existing.seq > client.seq) {
+    // A newer connection from this profile already owns the session.
+    trace("--", profile.id, "hello-from-superseded-socket-ignored");
+    client.socket.close();
+    return;
+  }
+
   client.profile = profile;
   client.profileId = profile.id;
   clients.set(profile.id, client);
+
+  /*
+   * They dropped mid-call and came back inside the grace window. Put them
+   * back in the session rather than making them requeue — the partner was
+   * never told anything happened.
+   */
+  const pendingDrop = reconnectGrace.get(profile.id);
+  if (pendingDrop) {
+    clearTimeout(pendingDrop.timer);
+    reconnectGrace.delete(profile.id);
+
+    if (sessions.has(pendingDrop.sessionId)) {
+      client.sessionId = pendingDrop.sessionId;
+      trace("--", profile.id, "reconnected-into-session");
+    }
+  }
 
   send(profile.id, ServerMessage.READY, { profileId: profile.id });
 }
@@ -419,8 +469,10 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (socket) => {
+  connectionSequence += 1;
   const client = {
     socket,
+    seq: connectionSequence,
     profile: null,
     profileId: null,
     sessionId: null,
@@ -460,10 +512,53 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     if (!client.profileId) return;
-    handleLeave(client);
-    matchmaker.cancel(client.profileId);
-    pending.delete(client.profileId);
-    clients.delete(client.profileId);
+
+    /*
+     * Ignore a socket that has already been replaced.
+     *
+     * The same profile can be connected twice for a moment — a reconnect, a
+     * second tab, React's development double-mount. The newer socket takes
+     * over the registry entry on hello, and when the older one finally closes
+     * this handler would otherwise tear down the LIVE session: it deletes the
+     * registry entry and tells the partner they left. The call dies and the
+     * cause looks like whatever the user happened to be doing at the time.
+     */
+    if (clients.get(client.profileId) !== client) {
+      trace("--", client.profileId, "stale-socket-close-ignored");
+      return;
+    }
+
+    const profileId = client.profileId;
+    const sessionId = client.sessionId;
+
+    matchmaker.cancel(profileId);
+    pending.delete(profileId);
+    clients.delete(profileId);
+
+    // Not in a call: nothing to hold open.
+    if (!sessionId) return;
+
+    trace("--", profileId, "dropped-mid-call, waiting for reconnect");
+
+    const timer = setTimeout(() => {
+      reconnectGrace.delete(profileId);
+
+      // Came back on a new socket in time — that socket owns the session now.
+      if (clients.has(profileId)) return;
+
+      const session = sessions.get(sessionId);
+      if (!session) return;
+
+      const partnerId = session.profileIds.find((id) => id !== profileId);
+      if (partnerId) {
+        const partner = clients.get(partnerId);
+        if (partner) partner.sessionId = null;
+        send(partnerId, ServerMessage.PEER_LEFT, { sessionId });
+      }
+      sessions.delete(sessionId);
+    }, RECONNECT_GRACE_MS);
+
+    reconnectGrace.set(profileId, { timer, sessionId });
   });
 });
 

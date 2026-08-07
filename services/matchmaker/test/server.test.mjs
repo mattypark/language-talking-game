@@ -51,17 +51,23 @@ function connect() {
         return Promise.resolve(found);
       }
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error(`timed out waiting for "${type}"`)),
-          timeoutMs,
-        );
-        waiters.push({
+        const waiter = {
           type,
           resolve: (m) => {
             clearTimeout(timer);
             resolve(m);
           },
-        });
+        };
+
+        const timer = setTimeout(() => {
+          // Drop the waiter, or it stays registered and swallows the message a
+          // later call is waiting for.
+          const index = waiters.indexOf(waiter);
+          if (index !== -1) waiters.splice(index, 1);
+          reject(new Error(`timed out waiting for "${type}"`));
+        }, timeoutMs);
+
+        waiters.push(waiter);
       });
     },
     close: () => socket.close(),
@@ -175,7 +181,7 @@ describe("matchmaker server", () => {
     bob.close();
   });
 
-  it("tells the other side when a socket simply disappears", async () => {
+  it("holds the call open briefly when a socket simply disappears", async () => {
     const carol = connect();
     const dave = connect();
     await Promise.all([carol.open(), dave.open()]);
@@ -199,7 +205,20 @@ describe("matchmaker server", () => {
     // Pull the plug rather than saying goodbye.
     carol.socket.terminate();
 
-    const left = await dave.next("peer-left");
+    /*
+     * A dropped socket is not a hang-up. Wifi hiccups, tabs throttle, and a
+     * reconnect swaps one socket for another — in every one of those the
+     * person is still there, and ending their partner's call would be both
+     * wrong and unrecoverable. So nothing happens immediately...
+     */
+    await assert.rejects(
+      () => dave.next("peer-left", 1500),
+      /timed out/,
+      "the partner must not be told the moment a socket drops",
+    );
+
+    // ...and the partner is only released once the reconnect window closes.
+    const left = await dave.next("peer-left", 12_000);
     assert.ok(left.sessionId);
     dave.close();
   });

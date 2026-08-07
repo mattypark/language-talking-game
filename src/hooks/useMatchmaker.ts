@@ -79,10 +79,22 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
   const onSignalRef = useRef(onSignal);
   const onPeerLeftRef = useRef(onPeerLeft);
 
+  /*
+   * The profile is read through a ref for the same reason.
+   *
+   * It is only used once, in the hello sent on open. Keeping it as an effect
+   * dependency means any re-render that hands over a newly-built object tears
+   * down a live socket — and the server reads that as the user leaving, so it
+   * tells their partner the call ended. The symptom appears wherever the
+   * re-render came from, which is never where the bug is.
+   */
+  const profileRef = useRef(profile);
+
   useEffect(() => {
     onSignalRef.current = onSignal;
     onPeerLeftRef.current = onPeerLeft;
-  }, [onSignal, onPeerLeft]);
+    profileRef.current = profile;
+  }, [onSignal, onPeerLeft, profile]);
 
   const send = useCallback((event: ClientEvent) => {
     const socket = socketRef.current;
@@ -171,7 +183,7 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
-        socket.send(JSON.stringify({ type: "hello", profile }));
+        socket.send(JSON.stringify({ type: "hello", profile: profileRef.current }));
       });
 
       socket.addEventListener("message", (message) => {
@@ -213,7 +225,8 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
       socketRef.current = null;
       socket?.close();
     };
-  }, [url, profile, handleEvent]);
+    // Only a different matchmaker URL may rebuild the socket.
+  }, [url, handleEvent]);
 
   const enqueue = useCallback(
     (choice: { language: string; topicId: string }) =>

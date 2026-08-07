@@ -59,11 +59,27 @@ export function useWebRtcAudio({
   const [reportedStatus, setStatus] = useState<CallStatus | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isRelayed, setIsRelayed] = useState(false);
+  const [localVideo, setLocalVideo] = useState<MediaStream | null>(null);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
   const status: CallStatus =
     reportedStatus ?? (localStream ? "connecting" : "idle");
 
   const peerRef = useRef<RTCPeerConnection | null>(null);
+  const videoSenderRef = useRef<RTCRtpSender | null>(null);
+  /** Set below; held in a ref so the peer's listeners can reach it. */
+  const renegotiateRef = useRef<(() => Promise<void>) | null>(null);
+
+  /*
+   * Config is read through a ref so the peer connection is NOT rebuilt when
+   * the array merely gets a new identity. Tearing down a live connection
+   * because a prop was recreated kills the call — and it happens exactly when
+   * something else re-renders, so it looks unrelated to whatever triggered it.
+   */
+  const iceServersRef = useRef(iceServers);
+  useEffect(() => {
+    iceServersRef.current = iceServers;
+  }, [iceServers]);
 
   // Assigned in an effect, not during render — React 19 forbids the latter.
   const sendSignalRef = useRef(sendSignal);
@@ -94,7 +110,24 @@ export function useWebRtcAudio({
   /** Which negotiation this side currently belongs to. */
   const negotiationIdRef = useRef<string | null>(null);
 
+  /**
+   * A renegotiation asked for while the connection was mid-exchange.
+   *
+   * Adding a camera fires a re-offer on both sides at almost the same instant.
+   * A peer can only be re-offered from a stable signalling state, so the
+   * second request arrives during the first and would simply be dropped —
+   * cameras attach, both sides believe they are sharing, and no frames ever
+   * move. Held here and replayed when the state settles instead.
+   */
+  const wantsRenegotiation = useRef(false);
+
   const close = useCallback(() => {
+    videoSenderRef.current = null;
+    setLocalVideo((current) => {
+      current?.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+    setHasRemoteVideo(false);
     peerRef.current?.close();
     peerRef.current = null;
     pendingCandidates.current = [];
@@ -106,7 +139,7 @@ export function useWebRtcAudio({
   useEffect(() => {
     if (!localStream) return;
 
-    const peer = new RTCPeerConnection({ iceServers });
+    const peer = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peerRef.current = peer;
 
     /*
@@ -136,6 +169,14 @@ export function useWebRtcAudio({
 
     peer.addEventListener("track", (event) => {
       setRemoteStream(event.streams[0] ?? null);
+      if (event.track.kind === "video") {
+        setHasRemoteVideo(true);
+        // A camera switched off arrives as the track ending, not as a new
+        // negotiation, so the tile has to react to that rather than to SDP.
+        event.track.addEventListener("ended", () => setHasRemoteVideo(false));
+        event.track.addEventListener("mute", () => setHasRemoteVideo(false));
+        event.track.addEventListener("unmute", () => setHasRemoteVideo(true));
+      }
     });
 
     peer.addEventListener("icecandidate", (event) => {
@@ -149,6 +190,14 @@ export function useWebRtcAudio({
         candidate: event.candidate.toJSON(),
         nid,
       });
+    });
+
+    peer.addEventListener("signalingstatechange", () => {
+      if (peer.signalingState !== "stable") return;
+      if (!wantsRenegotiation.current) return;
+      // Deferred a tick: re-offering from inside the state-change handler can
+      // land before the browser considers the previous exchange finished.
+      setTimeout(() => void renegotiateRef.current?.(), 0);
     });
 
     peer.addEventListener("connectionstatechange", () => {
@@ -187,7 +236,8 @@ export function useWebRtcAudio({
       peer.close();
       peerRef.current = null;
     };
-  }, [localStream, isOfferer, iceServers]);
+    // Only a new microphone or a changed role may rebuild the connection.
+  }, [localStream, isOfferer]);
 
   const applySignal = useCallback(
     async (peer: RTCPeerConnection, payload: unknown) => {
@@ -264,7 +314,93 @@ export function useWebRtcAudio({
     if (peerRef.current) void drainSignals();
   }, [localStream, drainSignals]);
 
-  return { status, remoteStream, isRelayed, receiveSignal, close };
+  /**
+   * Re-offer on a live connection.
+   *
+   * Only the designated offerer may do this — two simultaneous offers glare
+   * and both have to be rolled back. A fresh negotiation id per round is what
+   * lets the other side drop anything left over from the previous one.
+   */
+  const renegotiate = useCallback(async () => {
+    const peer = peerRef.current;
+    if (!peer || !isOfferer) return;
+
+    if (peer.signalingState !== "stable") {
+      wantsRenegotiation.current = true;
+      return;
+    }
+    wantsRenegotiation.current = false;
+
+    const negotiationId = crypto.randomUUID();
+    negotiationIdRef.current = negotiationId;
+    pendingCandidates.current = [];
+
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    sendSignalRef.current({
+      kind: "offer",
+      sdp: offer.sdp ?? "",
+      nid: negotiationId,
+    });
+  }, [isOfferer]);
+
+  useEffect(() => {
+    renegotiateRef.current = renegotiate;
+  }, [renegotiate]);
+
+  /**
+   * Add the camera to an existing call.
+   *
+   * Permission is requested here — at the moment both people agreed to it —
+   * and never on page load. A site that asks for your camera before you have
+   * decided to use it is one people close.
+   */
+  const enableVideo = useCallback(async (): Promise<boolean> => {
+    const peer = peerRef.current;
+    if (!peer || videoSenderRef.current) return false;
+
+    try {
+      const camera = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const track = camera.getVideoTracks()[0];
+      if (!track) return false;
+
+      videoSenderRef.current = peer.addTrack(track, camera);
+      setLocalVideo(camera);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /** Drop the camera. Either side may do this at any moment, unilaterally. */
+  const disableVideo = useCallback(() => {
+    const peer = peerRef.current;
+    const sender = videoSenderRef.current;
+
+    localVideo?.getTracks().forEach((track) => track.stop());
+    setLocalVideo(null);
+
+    if (peer && sender) {
+      peer.removeTrack(sender);
+      videoSenderRef.current = null;
+    }
+  }, [localVideo]);
+
+  return {
+    status,
+    remoteStream,
+    isRelayed,
+    receiveSignal,
+    close,
+    renegotiate,
+    enableVideo,
+    disableVideo,
+    localVideo,
+    hasRemoteVideo,
+    hasLocalVideo: localVideo !== null,
+  };
 }
 
 async function drainCandidates(
