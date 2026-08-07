@@ -57,6 +57,14 @@ cd services/matchmaker && npm install && npm start   # matchmaker, :4100
 Both are needed: the app cannot queue or place a call without the
 matchmaker, because a Vercel function cannot hold a WebSocket.
 
+**If you ever see `HTTP ERROR 431` on localhost**, it is not this app. Cookies
+are scoped to the *host*, not the port, so every project you have ever run on
+`localhost` shares one cookie jar — and once it grows past Node's default 16KB
+header limit, every request to every local server fails. The `dev` script raises
+the limit to 64KB. The real fix is to clear cookies for `localhost` in your
+browser; `http://127.0.0.1:3000` also works as an instant workaround, since it
+is a different host and therefore a different jar.
+
 Tests:
 
 ```bash
