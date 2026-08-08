@@ -542,3 +542,70 @@
   color: var(--stage-ink-dim);
   line-height: 1.3;
 }
+
+/*
+ * Nav underline. Wipes in from the left on hover and out to the right on
+ * leave, so the line has direction rather than just appearing.
+ */
+.stage__nav-link {
+  position: relative;
+  padding-bottom: 2px;
+}
+
+.stage__nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+
+.stage__nav-link:hover::after,
+.stage__nav-link:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage__nav-link::after {
+    transition: none;
+  }
+}
+
+/* The mic check sitting in the top-right of the stage. */
+.mic-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--stage-hairline);
+  border-radius: var(--radius-full);
+  background: oklch(0.12 0.01 60 / 0.35);
+  color: var(--stage-ink);
+  font-family: var(--font-sf);
+  font-weight: 600;
+  font-size: var(--text-caption);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-instant) var(--ease-standard),
+    background-color var(--dur-instant) var(--ease-standard);
+}
+
+.mic-check:hover,
+.mic-check:focus-visible {
+  border-color: var(--stage-ink);
+  background: oklch(0.12 0.01 60 / 0.6);
+}
+
+/* Idle bars breathe only on hover — an invitation, not an animation. */
+.mic-check__bar {
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transition: height var(--dur-base) var(--ease-standard);
+}

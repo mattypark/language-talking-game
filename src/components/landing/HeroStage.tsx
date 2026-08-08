@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { HeroMicCheck } from "./HeroMicCheck";
+import { HeroPresence } from "./HeroPresence";
 
 const HERO_PHOTO = "/hero.jpg";
 
@@ -58,6 +60,11 @@ export function HeroStage() {
       />
       <div className="stage__scrim" aria-hidden="true" />
 
+      {/* The mic check, in the corner the composition leaves empty. */}
+      <div className="absolute top-5 right-5 z-10 md:top-8 md:right-8">
+        <HeroMicCheck />
+      </div>
+
       {/* Top word, bled off the left edge exactly as the reference does. */}
       <div className="relative flex-1">
         <p
@@ -107,10 +114,10 @@ export function HeroStage() {
           speak
         </p>
 
-        <p className="stage__mark absolute bottom-6 left-5 md:left-8">
-          ©<br />
-          2026
-        </p>
+        <div className="absolute bottom-6 left-5 flex flex-col gap-2 md:left-8">
+          <HeroPresence />
+          <p className="stage__mark">© 2026</p>
+        </div>
       </div>
     </section>
   );
