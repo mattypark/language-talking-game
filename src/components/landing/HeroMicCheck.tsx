@@ -1,68 +1,64 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/cn";
 import { useMicLevels } from "@/hooks/useMicLevels";
 
-const IDLE_HEIGHTS = [6, 11, 16, 11, 6];
-const HOVER_HEIGHTS = [9, 16, 22, 16, 9];
+const BARS = 17;
+const MAX_HEIGHT = 56;
 
 /**
- * The microphone check, in the top corner of the hero.
+ * The mic check — the instrument, with nothing around it.
  *
- * It is the first thing this product needs from anyone, so it is offered
- * before signup rather than buried inside a call. Idle bars grow on hover —
- * enough to read as "this does something" without animating on its own.
+ * No container, no label. A wide array of hairline bars sitting directly on
+ * the stage, which reads as a level meter because that is exactly what it is.
+ * Hovering lifts the idle silhouette rather than animating on its own, so it
+ * invites a click without ever moving unprompted.
  *
- * Once running it shows real amplitude from the real microphone. Nothing is
- * recorded and nothing is sent; it only reads the level, and it says so.
+ * Live, it shows real amplitude in Claude orange. Nothing is recorded and
+ * nothing is sent — it only reads the level.
  */
 export function HeroMicCheck() {
   const [isHovered, setIsHovered] = useState(false);
-  const mic = useMicLevels({ bars: 5 });
+  const mic = useMicLevels({ bars: BARS });
 
   const isLive = mic.status === "live";
-  const idle = isHovered ? HOVER_HEIGHTS : IDLE_HEIGHTS;
 
-  const label =
-    mic.status === "requesting"
-      ? "Asking…"
-      : mic.status === "denied"
-        ? "Mic blocked"
-        : isLive
-          ? "We can hear you"
-          : "Test your mic";
+  /** A shallow arc at rest, lifted on hover. */
+  const idleHeight = (index: number) => {
+    const fromCentre = Math.abs(index - (BARS - 1) / 2) / ((BARS - 1) / 2);
+    const base = 1 - fromCentre * 0.72;
+    return Math.round((isHovered ? 26 : 16) * base + 4);
+  };
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <button
-        type="button"
-        className="mic-check"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onClick={() => (isLive ? mic.stop() : void mic.start())}
-        aria-pressed={isLive}
+    <button
+      type="button"
+      className={cn("mic-check", isLive && "mic-check--live")}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => (isLive ? mic.stop() : void mic.start())}
+      aria-pressed={isLive}
+      aria-label={isLive ? "Stop the microphone check" : "Check your microphone"}
+      title={isLive ? "Listening — nothing is recorded" : "Check your microphone"}
+    >
+      <span
+        className="flex items-center gap-[4px]"
+        style={{ height: MAX_HEIGHT }}
+        aria-hidden="true"
       >
-        <span className="flex h-6 items-center gap-[3px]" aria-hidden="true">
-          {(isLive ? mic.levels : idle).map((value, i) => (
-            <span
-              key={i}
-              className="mic-check__bar"
-              style={{
-                height: isLive
-                  ? `${Math.max(3, Math.min(24, value * 24))}px`
-                  : `${idle[i]}px`,
-              }}
-            />
-          ))}
-        </span>
-        {label}
-      </button>
-
-      {isLive || mic.errorMessage ? (
-        <p className="stage__mark max-w-[15rem] text-right normal-case">
-          {mic.errorMessage ?? "Nothing is recorded. This only reads the level."}
-        </p>
-      ) : null}
-    </div>
+        {Array.from({ length: BARS }, (_, i) => (
+          <span
+            key={i}
+            className="mic-check__bar"
+            style={{
+              height: isLive
+                ? `${Math.max(4, Math.min(MAX_HEIGHT, (mic.levels[i] ?? 0) * MAX_HEIGHT * 1.6))}px`
+                : `${idleHeight(i)}px`,
+            }}
+          />
+        ))}
+      </span>
+    </button>
   );
 }

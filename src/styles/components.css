@@ -531,8 +531,9 @@
   transition: opacity var(--dur-instant) var(--ease-standard);
 }
 
-.stage__nav-link:hover {
-  opacity: 0.62;
+.stage__nav-link:hover,
+.stage__nav-link:focus-visible {
+  color: var(--stage-accent);
 }
 
 .stage__mark {
@@ -577,35 +578,39 @@
   }
 }
 
-/* The mic check sitting in the top-right of the stage. */
+/*
+ * The mic check: no container, no label, just the instrument.
+ *
+ * A wide array of hairline bars sitting directly on the stage. It reads as a
+ * level meter because that is exactly what it is — the same measurement the
+ * call screen uses, at the size of a piece of equipment rather than a button.
+ */
 .mic-check {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--stage-hairline);
-  border-radius: var(--radius-full);
-  background: oklch(0.12 0.01 60 / 0.35);
+  gap: 4px;
+  padding: var(--space-2);
+  background: transparent;
+  border: 0;
   color: var(--stage-ink);
-  font-family: var(--font-sf);
-  font-weight: 600;
-  font-size: var(--text-caption);
   cursor: pointer;
-  transition:
-    border-color var(--dur-instant) var(--ease-standard),
-    background-color var(--dur-instant) var(--ease-standard);
 }
 
 .mic-check:hover,
 .mic-check:focus-visible {
-  border-color: var(--stage-ink);
-  background: oklch(0.12 0.01 60 / 0.6);
+  color: var(--stage-accent);
 }
 
-/* Idle bars breathe only on hover — an invitation, not an animation. */
 .mic-check__bar {
-  width: 2px;
+  width: 3px;
   border-radius: var(--radius-full);
   background: currentColor;
-  transition: height var(--dur-base) var(--ease-standard);
+  transition:
+    height var(--dur-base) var(--ease-standard),
+    background-color var(--dur-instant) var(--ease-standard);
+}
+
+/* Live is Claude orange, so the running state is unmistakable. */
+.mic-check--live {
+  color: var(--stage-accent);
 }

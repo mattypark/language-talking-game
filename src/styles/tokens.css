@@ -68,6 +68,8 @@
   --stage-ink: oklch(0.93 0.012 85); /* cream — 14:1 on the stage */
   --stage-ink-dim: oklch(0.74 0.014 85);
   --stage-hairline: oklch(0.93 0.012 85 / 0.32);
+  /* Claude orange — the stage's highlight. Hover, live state, nothing else. */
+  --stage-accent: oklch(0.685 0.115 40); /* ~#D97757 */
 
   /* ----------------------------------------------------------------- signal
    * Semantic only. Never decorative. Never a fourth brand color.

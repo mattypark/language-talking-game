@@ -48,6 +48,7 @@
   --color-stage-deep: var(--stage-deep);
   --color-stage-ink: var(--stage-ink);
   --color-stage-ink-dim: var(--stage-ink-dim);
+  --color-stage-accent: var(--stage-accent);
 
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);

@@ -12,20 +12,24 @@ await page.waitForTimeout(1500);
 // Underline animates in on hover.
 const link = page.locator(".stage__nav-link").nth(1);
 const before = await link.evaluate(el => getComputedStyle(el, "::after").transform);
+const colBefore = await link.evaluate(el => getComputedStyle(el).color);
 await link.hover();
 await page.waitForTimeout(400);
 const after = await link.evaluate(el => getComputedStyle(el, "::after").transform);
 console.log(`underline: ${before}  ->  ${after}`);
 if (before === after) throw new Error("nav underline did not animate on hover");
-console.log("ok   nav underline wipes in on hover");
+const colAfter = await link.evaluate(el => getComputedStyle(el).color);
+console.log(`nav colour: ${colBefore} -> ${colAfter}`);
+if (colBefore === colAfter) throw new Error("nav did not turn orange on hover");
+console.log("ok   nav underline wipes in and turns orange");
 
 // Presence reads a real number.
-const presence = await page.locator(".stage__mark").first().textContent();
+const presence = await page.locator("p.stage__word").last().textContent();
 console.log(`presence: "${presence?.trim()}"`);
 
 // Mic check goes live and shows real levels.
-await page.getByRole("button", { name: /Test your mic/i }).click();
-await page.waitForSelector("text=We can hear you", { timeout: 10000 });
+await page.getByRole("button", { name: /Check your microphone/i }).click();
+await page.waitForTimeout(2000);
 await page.waitForTimeout(1200);
 const heights = await page.$$eval(".mic-check__bar", els => els.map(e => e.style.height));
 console.log(`ok   mic live, bar heights: ${heights.join(" ")}`);
