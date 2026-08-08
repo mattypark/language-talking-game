@@ -42,6 +42,12 @@
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-sf: var(--font-sf);
+
+  --color-stage: var(--stage);
+  --color-stage-deep: var(--stage-deep);
+  --color-stage-ink: var(--stage-ink);
+  --color-stage-ink-dim: var(--stage-ink-dim);
 
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);

@@ -56,6 +56,19 @@
   --accent-tint: oklch(0.955 0.032 55); /* #FDEDE2 — selected row, topic-card wash */
   --on-accent: oklch(1 0 0); /* #FFFFFF — text on accent fill */
 
+  /* ---------------------------------------------------------------- stage
+   * The dark surface the hero lives on.
+   *
+   * A separate set rather than a dark-mode inversion of the light palette:
+   * this is one deliberate full-bleed surface, not the whole product turned
+   * inside out. The rest of the app stays on paper.
+   */
+  --stage: oklch(0.17 0.012 60); /* near-black, warm */
+  --stage-deep: oklch(0.12 0.01 60);
+  --stage-ink: oklch(0.93 0.012 85); /* cream — 14:1 on the stage */
+  --stage-ink-dim: oklch(0.74 0.014 85);
+  --stage-hairline: oklch(0.93 0.012 85 / 0.32);
+
   /* ----------------------------------------------------------------- signal
    * Semantic only. Never decorative. Never a fourth brand color.
    * Each of these has exactly one meaning and may not be reused for another.
@@ -84,6 +97,18 @@
    * reads as amateur), any rounded face in body copy (reads as children's
    * software and undercuts the scorecard's credibility).
    */
+  /*
+   * SF Pro, for anything that has to read as an interface element rather than
+   * as display type — nav, labels, small caps. Bold by default at those sizes,
+   * which is what gives the thin display face something to push against.
+   *
+   * Not downloaded: it is the system face on Apple hardware and falls back to
+   * the platform UI font everywhere else, which is the correct behaviour.
+   */
+  --font-sf:
+    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+
   /* Both families are injected by next/font in src/app/layout.tsx. */
   --font-sans:
     var(--font-switzer), "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,

@@ -452,3 +452,93 @@
     }
   }
 }
+
+/* =================================================================== stage
+ * The dark, full-bleed surface the hero sits on.
+ *
+ * Deliberately scoped rather than global: this is one composed surface, not a
+ * dark mode. Everything past the hero stays on paper.
+ */
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--stage-deep);
+  color: var(--stage-ink);
+}
+
+/*
+ * The backdrop. A photograph when one exists at public/hero.jpg, and until
+ * then a built composition rather than a flat colour — angled shafts of warm
+ * light across a dark plane, which is the shape the reference photograph makes.
+ */
+.stage__backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: var(--stage);
+  background-image:
+    linear-gradient(107deg, oklch(0.62 0.13 55 / 0.5) 0%, transparent 34%),
+    linear-gradient(107deg, transparent 38%, oklch(0.55 0.12 50 / 0.42) 46%, transparent 58%),
+    linear-gradient(107deg, transparent 62%, oklch(0.46 0.1 48 / 0.36) 70%, transparent 82%),
+    radial-gradient(120% 90% at 22% 8%, oklch(0.7 0.14 60 / 0.4) 0%, transparent 62%),
+    radial-gradient(90% 80% at 88% 96%, oklch(0.24 0.05 50 / 0.9) 0%, transparent 70%);
+  background-size: cover;
+  background-position: center;
+}
+
+.stage__backdrop--photo {
+  background-image: var(--stage-photo);
+}
+
+/* Keeps the type legible over whatever ends up behind it. */
+.stage__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    oklch(0.12 0.01 60 / 0.45) 0%,
+    oklch(0.12 0.01 60 / 0.18) 40%,
+    oklch(0.12 0.01 60 / 0.6) 100%
+  );
+}
+
+/*
+ * The display type. Very light weight at very large size — the contrast
+ * between hairline letterforms and a heavy photograph is the whole effect,
+ * and any more weight collapses it.
+ */
+.stage__word {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  line-height: 0.82;
+  letter-spacing: -0.03em;
+  color: var(--stage-ink);
+  white-space: nowrap;
+}
+
+/* The hairline rule the navigation sits on. */
+.stage__rule {
+  border-top: 1px solid var(--stage-hairline);
+}
+
+/* Interface type on the stage is SF Pro, and it is bold. */
+.stage__nav-link {
+  font-family: var(--font-sf);
+  font-weight: 600;
+  font-size: var(--text-caption);
+  color: var(--stage-ink);
+  letter-spacing: -0.005em;
+  transition: opacity var(--dur-instant) var(--ease-standard);
+}
+
+.stage__nav-link:hover {
+  opacity: 0.62;
+}
+
+.stage__mark {
+  font-family: var(--font-sf);
+  font-weight: 600;
+  font-size: var(--text-micro);
+  color: var(--stage-ink-dim);
+  line-height: 1.3;
+}

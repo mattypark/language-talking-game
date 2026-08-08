@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { OnAirMark } from "@/components/landing/OnAirMark";
+import { HeroStage } from "@/components/landing/HeroStage";
 import { SmoothScroll } from "@/components/landing/SmoothScroll";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,18 +13,17 @@ export default function HomePage() {
     <>
       <SmoothScroll />
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-5">
-        {/* Hero. Deliberately left-aligned — a centred hero is the default tell. */}
-        <section className="pt-16 pb-24">
-          <OnAirMark />
+      <HeroStage />
 
-          <p className="t-body-lg mt-8 mb-4 max-w-lg text-ink-muted">
-            Get matched with someone else practising English, talk for{" "}
+      <main className="mx-auto w-full max-w-2xl flex-1 px-5">
+        <section className="pt-16 pb-4">
+          <p className="t-body-lg mb-8 max-w-lg text-ink-muted">
+            Get matched with someone else practising the same language, talk for{" "}
             {MINUTES} minutes about a topic neither of you picked, and find out
             afterwards exactly how you sounded.
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link href="/welcome">
               <Button variant="primary" size="lg">
                 Join a room
