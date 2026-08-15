@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 
 const DEMO_SRC = "/demo.mp4";
+const DEMO_POSTER = "/demo-poster.jpg";
 
 /**
  * The walkthrough film.
@@ -16,6 +17,12 @@ const DEMO_SRC = "/demo.mp4";
  * Muted, looping and inline: it is illustration, not something to sit through.
  * Controls are still exposed, because a video that cannot be paused is a video
  * that cannot be read.
+ *
+ * The aspect ratio is declared rather than inherited from the file, so the page
+ * does not reflow when metadata loads — see docs/recording-brief.md, which
+ * locks the recording to 16:9 for exactly this reason. `muted`, `loop`,
+ * `playsInline` and `autoPlay` together satisfy every browser's autoplay
+ * policy; the poster is what shows if one refuses anyway.
  */
 export function DemoFilm() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,7 +46,7 @@ export function DemoFilm() {
 
   if (isMissing) {
     return (
-      <div className="rounded-lg border border-dashed border-hairline-strong bg-sunken p-8 text-center">
+      <div className="aspect-video flex flex-col items-center justify-center rounded-lg border border-hairline bg-surface p-8 text-center">
         <Badge tone="warn" className="mb-4">
           No walkthrough recorded yet
         </Badge>
@@ -57,9 +64,11 @@ export function DemoFilm() {
     <figure>
       <video
         ref={videoRef}
-        className="w-full rounded-lg border border-hairline bg-sunken"
+        className="aspect-video w-full rounded-lg border border-hairline bg-sunken"
         src={DEMO_SRC}
+        poster={DEMO_POSTER}
         controls
+        autoPlay
         muted
         loop
         playsInline

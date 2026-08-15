@@ -5,24 +5,26 @@ import { createAccount, type FormResult } from "@/app/actions/account";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { FormError, Select, TextInput } from "@/components/ui/Field";
+import { FormError, TextInput } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
-import {
-  AGE_BANDS,
-  COMMON_FIRST_LANGUAGES,
-  LEVEL_BANDS,
-  TARGET_LANGUAGES,
-} from "@/lib/domain";
+import { AGE_BANDS, LEVEL_BANDS, TARGET_LANGUAGES } from "@/lib/domain";
 
-const STEPS = ["Name", "Language", "Level", "You"] as const;
+const STEPS = ["You", "Level", "Age"] as const;
 
 /**
  * Setup, one question at a time.
  *
- * A single long form asks for everything at once and reads as paperwork. Four
- * screens with a visible end in sight get finished — and each one has room to
- * explain why it is being asked, which matters here because two of these
- * answers decide who a stranger gets put on a microphone with.
+ * A single long form asks for everything at once and reads as paperwork. Steps
+ * with a visible end in sight get finished — and each one has room to explain
+ * why it is being asked, which matters here because two of these answers decide
+ * who a stranger gets put on a microphone with.
+ *
+ * Three steps, not four. Name and language used to be separate screens; neither
+ * takes any thought, so they share one. The question that used to be here and
+ * no longer is — which language you already speak — only ever nudged partner
+ * sorting, never gating, so asking for it before someone has had a single
+ * conversation was paying real friction for a preference. It moves to after the
+ * first call, where the answer is worth something.
  *
  * Every answer stays mounted in the DOM, so the whole thing submits as one
  * form and there is no partial state to lose on a refresh.
@@ -38,11 +40,9 @@ export function JoinForm() {
   const [language, setLanguage] = useState<string>(TARGET_LANGUAGES[0].code);
   const [levelBand, setLevelBand] = useState<string>("intermediate");
   const [ageBand, setAgeBand] = useState<string>("");
-  const [firstLanguage, setFirstLanguage] = useState("Spanish");
 
   const canAdvance = [
-    displayName.trim().length >= 2,
-    language.length > 0,
+    displayName.trim().length >= 2 && language.length > 0,
     levelBand.length > 0,
     ageBand.length > 0,
   ][step];
@@ -56,33 +56,31 @@ export function JoinForm() {
       <input type="hidden" name="targetLanguage" value={language} />
       <input type="hidden" name="levelBand" value={levelBand} />
       <input type="hidden" name="ageBand" value={ageBand} />
-      <input type="hidden" name="firstLanguage" value={firstLanguage} />
 
       <Stepper current={step} />
 
-      <div className="min-h-[22rem]">
+      <div className="min-h-[24rem]">
         {step === 0 ? (
           <Question
-            title="What should people call you?"
-            why="Your partner sees this before you speak. A first name or a handle is plenty — it doesn't have to be real."
+            title="Who are you, and what are you practising?"
+            why="Your partner sees the name before you speak — a first name or a handle is plenty, it doesn't have to be real. You'll only ever be matched with someone practising the same language."
           >
-            <TextInput
-              id="displayNameInput"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              maxLength={24}
-              autoComplete="nickname"
-              placeholder="Matthew"
-              autoFocus
-            />
-          </Question>
-        ) : null}
+            <div className="mb-7">
+              <label className="field__label" htmlFor="displayName">
+                Name
+              </label>
+              <TextInput
+                id="displayName"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                maxLength={24}
+                autoComplete="nickname"
+                placeholder="Matthew"
+                autoFocus
+              />
+            </div>
 
-        {step === 1 ? (
-          <Question
-            title="Which language are you practising?"
-            why="You'll only ever be matched with someone practising the same one."
-          >
+            <p className="field__label mb-2">Language</p>
             <div className="grid grid-cols-2 gap-2">
               {TARGET_LANGUAGES.map((option) => (
                 <TileButton
@@ -97,7 +95,7 @@ export function JoinForm() {
           </Question>
         ) : null}
 
-        {step === 2 ? (
+        {step === 1 ? (
           <Question
             title="How comfortable are you speaking it?"
             why="You'll meet your band or the one next to it. Answer honestly rather than optimistically — a conversation above your level is just a quiet one, and the report re-rates you over time anyway."
@@ -118,12 +116,12 @@ export function JoinForm() {
           </Question>
         ) : null}
 
-        {step === 3 ? (
+        {step === 2 ? (
           <Question
-            title="Last two"
-            why="Age decides which pool you're in. Under-18s and adults are never matched with each other — that's a rule in the matcher, not a setting."
+            title="One more"
+            why="Age decides which pool you're in. Under-18s and adults are never matched with each other — that's a rule in the matcher and in the database, not a setting."
           >
-            <div className="mb-7 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {AGE_BANDS.map((band) => (
                 <TileButton
                   key={band.id}
@@ -133,26 +131,6 @@ export function JoinForm() {
                 />
               ))}
             </div>
-
-            <label className="field__label" htmlFor="firstLanguage">
-              What language do you already speak?
-            </label>
-            <Select
-              id="firstLanguage"
-              value={firstLanguage}
-              onChange={(event) => setFirstLanguage(event.target.value)}
-            >
-              {COMMON_FIRST_LANGUAGES.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </Select>
-            <p className="field__hint">
-              Used to pair you with someone who speaks something different, so
-              you both stay in the language you&rsquo;re learning instead of
-              falling back.
-            </p>
           </Question>
         ) : null}
       </div>
@@ -166,9 +144,7 @@ export function JoinForm() {
             <Badge tone="accent">
               {TARGET_LANGUAGES.find((l) => l.code === language)?.label}
             </Badge>
-            {step > 1 ? (
-              <Badge>{LEVEL_BANDS.find((b) => b.id === levelBand)?.cefr}</Badge>
-            ) : null}
+            <Badge>{LEVEL_BANDS.find((b) => b.id === levelBand)?.cefr}</Badge>
             {ageBand ? (
               <Badge tone="live">
                 {AGE_BANDS.find((b) => b.id === ageBand)?.label}

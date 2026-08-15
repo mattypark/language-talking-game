@@ -32,17 +32,27 @@ await step("home", async () => {
   await page.goto(BASE, { waitUntil: "networkidle" });
 });
 
+await step("welcome", async () => {
+  await page.getByRole("link", { name: "Join a room" }).first().click();
+  await page.waitForURL("**/welcome");
+});
+
 await step("join form", async () => {
   await page.getByRole("button", { name: "Set yourself up" }).click();
   await page.waitForURL("**/join");
 });
 
+// Three steps: name + language, then level, then age band.
 await step("submit profile as adult", async () => {
   await page.fill("#displayName", "Matthew");
-  await page.getByText("Fairly fluent").click();
-  await page.getByText("18 or over").click();
-  await page.selectOption("#firstLanguage", "Korean");
+  await page.getByRole("button", { name: /^English/ }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByText("Fairly fluent").click();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByText("18 or over").click();
+  await page.getByRole("button", { name: "Start practising" }).click();
   await page.waitForURL("**/rules");
 });
 await page.screenshot({ path: `${OUT}/s2-rules.png`, fullPage: true });

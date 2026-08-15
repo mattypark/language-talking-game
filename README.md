@@ -90,7 +90,7 @@ service stubbed. Copy it to `.env.local` when you have real keys.
 
 ## Design system
 
-Direction: **On Air** — a warm paper-bright studio. One hot accent, one
+Direction: **On Air** — a warm dark studio. One hot accent, one
 live-green signal light, hairline structure instead of shadows, and motion that
 only ever confirms a state change.
 
@@ -107,13 +107,19 @@ color, or duration into a component, the token is missing — add it.
 3. **One meaning per color, forever.** Green is live. Blue is the partner. Red is
    destructive. No exceptions — this is what makes the call screen readable at a
    glance.
-4. **No gradients.** Single exception: the waveform may ramp chroma within one hue.
+4. **No gradients.** Two exceptions, both named: the waveform may ramp chroma
+   within one hue, and the stage backdrop composes shafts of light.
 5. **Cards at rest get a border, never a shadow.** Only two shadows exist, both
    for things that float.
 6. **Radius is deliberately non-uniform.** 6 chip / 10 button / 14 card / 20 sheet
    / pill. Nothing above 20px except pills.
-7. **Dark mode ships in v1.1**, as a real inversion — not as a filter, and not as
-   the default.
+7. **The product is dark. One surface family, no light mode, no toggle.**
+   A real inversion, not a filter: every semantic colour was re-derived against
+   a dark surface rather than reused, because a tint tuned on paper becomes a
+   dark wash and an `-ink` variant has to get *lighter*, not darker.
+   The rule that replaces "no neon-on-dark" is a **chroma ceiling of 0.19** —
+   accents live at 0.13–0.16 — and unlike a taste rule it can be checked by
+   reading `tokens.css`.
 
 ### Motion — the complete list
 
@@ -141,9 +147,9 @@ These are the concrete tells that make an interface read as machine-generated.
 None of them ship here.
 
 **Color** — purple/violet/indigo as accent · two-hue gradients · gradient text ·
-blurred floating gradient blobs · colored glow shadows · neon-on-dark · dark mode
-as the default or only mode · more than one high-chroma accent on screen · any
-color carrying two meanings.
+blurred floating gradient blobs · colored glow shadows · any token above 0.19
+chroma · more than one high-chroma accent on screen · any color carrying two
+meanings · pure `#000` as a surface or pure `#FFF` as text.
 
 **Surfaces** — a thick colored border on one side of a card · decorative
 glassmorphism · cards inside cards · the same radius on everything · any radius
@@ -169,27 +175,53 @@ time.
 
 ### Why the accent has two steps
 
-A mid-bright orange fails 4.5:1 against **both** white and near-black, so no
-single value can carry a button label *and* stay vivid. The first clementine
-tried here measured 3.02:1 under a white label — a ship blocker. So:
+On paper the reason was a contrast trap: a mid-bright orange failed 4.5:1
+against **both** white and near-black, so no single value could carry a button
+label *and* stay vivid. The first clementine tried here measured 3.02:1 under a
+white label — a ship blocker.
+
+On the dark surface the accent clears 3:1 on its own, so the second step is now
+about vividness for rails and marks rather than about escaping that trap. The
+split survives; the reasoning changed.
 
 | Token | Job | Measured |
 | --- | --- | --- |
-| `--accent` | Fills that carry text. Buttons. | White label at **4.68:1** |
-| `--accent-bright` | Rails, marks, waveform. **Never text.** | **3.35:1** on canvas |
-| `--accent-ink` | The accent used *as* text | **7.34:1** on canvas |
+| `--accent` | Fills that carry text. Buttons. | Near-black label at **5.72:1** |
+| `--accent-bright` | Rails, marks, waveform. **Never text.** | **6.59:1** on a card |
+| `--accent-ink` | The accent used *as* text | **7.71:1** on a card |
+
+**`--on-accent` is near-black, not white.** The accent had to get bright enough
+to read as a UI element on a dark page, and white on it measures 3.30:1 — a
+fail. This is the single most surprising value in the file and it is deliberate.
 
 `--ink-subtle` clears 3:1 but not 4.5:1, so it is never copy a user has to read —
-disabled controls and decorative rules only. `--ink-muted` is the lightest ink
-allowed on real text.
+disabled controls and decorative rules only. That gap is enforced from *both*
+sides by the audit: if a palette tweak ever lifts it past 4.5 the check fails,
+because the rule stops being true the moment the token becomes readable.
+`--ink-muted` is the lightest ink allowed on real text.
 
-Run `node scripts/contrast-audit.mjs` against a dev server to re-check all 23
-pairs after any palette change. It measures rendered pixels, not arithmetic.
+There is only one orange. Claude orange sat 1.12:1 from Clementine on the same
+background — two indistinguishable high-chroma accents on one screen, which
+rule 1 forbids. `--stage-accent` is now an alias of `--accent-bright`, and
+`--stage-ink` / `--stage-ink-dim` are aliases of `--ink` / `--ink-muted`.
+
+Run `node scripts/contrast-audit.mjs` against a dev server to re-check all 48
+pairs after any palette change. It measures rendered pixels, not arithmetic —
+and it composites translucent tokens over their real backdrop rather than
+reporting them at full strength.
 
 ### Accessibility floor — ship-blocking
 
 - Body text at least 4.5:1. UI components, icons, and state indicators at least 3:1.
-- `--accent` as *text* fails on white. That's why `--accent-ink` exists — use it.
+- `--accent` as *text* fails. That's why `--accent-ink` exists — use it.
+- `--danger` as *text* on its own tint measures 4.06:1 and fails. Use
+  `--danger-ink`.
+- `color-scheme: dark` on `html` is ship-blocking, not cosmetic: without it the
+  native `<video>` controls, scrollbars, `<dialog>` defaults and Chrome's
+  autofill box all render light on top of a dark page.
+- `--ink` stops short of pure white and the canvas stops short of pure black.
+  Maximum contrast is not the goal — cream on near-black at 15:1 already smears
+  for readers with astigmatism, and going further makes it worse.
 - Focus visible on everything. `outline: none` is a blocker.
 - No status carried by color alone. The live dot ships with the word "Live"; a
   speaking tile ships with a ring *and* a tint.

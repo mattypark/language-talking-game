@@ -2,30 +2,45 @@ import { redirect } from "next/navigation";
 import { acceptRules } from "@/app/actions/account";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FlowSpine } from "@/components/onboarding/FlowSpine";
 import { getCurrentProfile } from "@/lib/auth";
 
-export const metadata = { title: "House rules · On Air" };
+export const metadata = { title: "What to expect · On Air" };
 
-const RULES = [
+/**
+ * The rules page, framed as the thing it actually is.
+ *
+ * This is a consent gate and it cannot be removed — but it used to read as
+ * terms-and-conditions standing between someone and a conversation, which is
+ * the worst possible thing to put in front of a value moment. It is now written
+ * from the other direction: this is what the stranger on the other end has
+ * already agreed to. The same five commitments, stated as reassurance rather
+ * than as obligation, because for someone about to speak a foreign language
+ * with a stranger that is genuinely the more useful reading.
+ *
+ * Each rule states what YOU agreed to and what THEY did. Reciprocity is the
+ * whole point — the rules only work because both sides accepted them.
+ */
+const EXPECTATIONS = [
   {
-    title: "Speak English the whole way through",
+    title: "They'll stay in the language, and so will you",
     body: "You'll both be tempted to fall back. Resist it — the struggle is the practice, and the report can tell when you switched.",
   },
   {
-    title: "Let the other person finish",
-    body: "Turn-taking is one of the five things you're scored on. Talking over someone costs you points and costs them practice.",
+    title: "They'll let you finish",
+    body: "Turn-taking is one of the five things you're both scored on. Talking over someone costs them points and costs you practice. It runs both ways.",
   },
   {
-    title: "Stay on the topic you're given",
-    body: "Neither of you picked it. That's the point — unprepared speech is the only kind worth measuring.",
+    title: "Neither of you picked the topic",
+    body: "That's the point — unprepared speech is the only kind worth measuring, and nobody arrives with an advantage.",
   },
   {
-    title: "Your side of the call is recorded",
-    body: "Only your own microphone, only so it can be scored, and it's deleted once your report is ready. Your partner is told exactly the same thing.",
+    title: "They're recording their own microphone, exactly like you",
+    body: "Only your own side, only so it can be scored, deleted once your report is ready. They were shown this same sentence about theirs.",
   },
   {
-    title: "Report anything that isn't practice",
-    body: "The call ends immediately and the last minute is kept as evidence. Harassment, sexual content, or contact-swapping ends an account.",
+    title: "Either of you can end it instantly",
+    body: "Reporting hangs up on the spot and keeps the last minute as evidence. Nobody should have to sit through a confirmation dialog to make something stop. Harassment, sexual content, or contact-swapping ends an account.",
   },
 ];
 
@@ -36,15 +51,17 @@ export default async function RulesPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-14">
-      <h1 className="t-title-1 mb-2">Five house rules</h1>
+      <FlowSpine current="expect" />
+
+      <h1 className="t-title-1 mb-2">What to expect from the person you meet</h1>
       <p className="t-body mb-8 text-ink-muted">
-        Read them once. You&rsquo;re about to be on a live microphone with a
-        stranger, and every one of these exists because of something that went
+        Five things they&rsquo;ve already agreed to, and that you&rsquo;re
+        agreeing to now. Every one of them exists because of something that went
         wrong somewhere else.
       </p>
 
       <div className="space-y-3">
-        {RULES.map((rule) => (
+        {EXPECTATIONS.map((rule) => (
           <Card key={rule.title} className="p-5">
             <h2 className="t-title-3 mb-1">{rule.title}</h2>
             <p className="t-body text-ink-muted">{rule.body}</p>

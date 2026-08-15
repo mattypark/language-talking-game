@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DemoFilm } from "@/components/landing/DemoFilm";
+import { LivePresence } from "@/components/onboarding/LivePresence";
+import { MicPrime } from "@/components/onboarding/MicPrime";
 import { SESSION_SECONDS, TARGET_LANGUAGES } from "@/lib/domain";
 
 export const metadata = { title: "How On Air works" };
@@ -16,21 +18,36 @@ const MINUTES = Math.round(SESSION_SECONDS / 60);
  * thing is, what actually happens in a session, what it does with their voice,
  * and what it will not do. Nobody should reach a setup form still wondering
  * what they signed up for.
+ *
+ * The order is deliberate and it is the thing that changed. The one part of
+ * this product a signed-out visitor can actually operate — the microphone
+ * check — now sits above everything, because a working instrument is worth
+ * more than any amount of copy about one. The permission prime is the same
+ * pattern Babbel uses: our own UI in front of the browser dialog, so a refusal
+ * is never the first interaction. The demo film and the live count follow, and
+ * the setup form is the last thing on the page rather than the first thing
+ * anyone is asked for.
  */
 export default function WelcomePage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-16">
-      <header className="pt-14 pb-10">
+      <header className="pt-14 pb-8">
         <Badge className="mb-5">Welcome</Badge>
         <h1 className="t-display mb-4">
           You already know more than you can say out loud.
         </h1>
-        <p className="t-body-lg max-w-lg text-ink-muted">
+        <p className="t-body-lg mb-5 max-w-lg text-ink-muted">
           On Air puts you on a {MINUTES}-minute call with someone else learning
           the same language, hands you both a topic neither of you picked, and
           tells you afterwards exactly how you sounded.
         </p>
+        <LivePresence />
       </header>
+
+      {/* The one thing on this page that is not a description of something. */}
+      <section className="mb-14">
+        <MicPrime />
+      </section>
 
       {/* The demo. A real file when there is one, an honest gap when there isn't. */}
       <section className="mb-14">
@@ -131,7 +148,7 @@ export default function WelcomePage() {
       <Card tone="topic" className="p-7 pl-8">
         <h2 className="t-title-2 mb-2">Ready?</h2>
         <p className="t-body mb-6 text-ink-muted">
-          Four questions, about thirty seconds. Two of them decide who you get
+          Three questions, about twenty seconds. Two of them decide who you get
           matched with.
         </p>
         <Link href="/join">

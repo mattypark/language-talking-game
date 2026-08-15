@@ -10,6 +10,7 @@
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-raised: var(--raised);
   --color-sunken: var(--sunken);
   --color-hairline: var(--hairline);
   --color-hairline-strong: var(--hairline-strong);
@@ -39,6 +40,7 @@
 
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
+  --color-danger-ink: var(--danger-ink);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -63,6 +65,14 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+
+  /*
+   * The single most forgettable line in a dark-only product, and it fixes four
+   * separate bugs at once: native <video controls> in DemoFilm and CallView,
+   * scrollbars, <dialog> defaults under Sheet, and Chrome's autofill painting a
+   * pale box straight over .input on the join form.
+   */
+  color-scheme: dark;
 }
 
 body {
@@ -72,7 +82,11 @@ body {
   font-size: var(--text-body);
   line-height: var(--text-body-lh);
   font-weight: var(--weight-read);
-  -webkit-font-smoothing: antialiased;
+  /*
+   * Subpixel, not `antialiased`. Greyscale smoothing thins light-on-dark
+   * glyphs noticeably, and this palette is cream on near-black everywhere.
+   */
+  -webkit-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 

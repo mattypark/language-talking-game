@@ -83,7 +83,9 @@
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background: var(--sunken);
+  /* --raised, not --sunken. On a dark page a hover that darkens reads as the
+     control receding, which is the opposite of what a hover should say. */
+  background: var(--raised);
   border-color: var(--hairline-strong);
 }
 
@@ -93,7 +95,7 @@
 }
 
 .btn--ghost:hover:not(:disabled) {
-  background: var(--sunken);
+  background: var(--raised);
   color: var(--ink);
 }
 
@@ -104,7 +106,8 @@
  */
 .btn--danger-ghost {
   background: transparent;
-  color: var(--danger);
+  /* --danger as text on --danger-tint is 4.06:1 and fails the body floor. */
+  color: var(--danger-ink);
 }
 
 .btn--danger-ghost:hover:not(:disabled) {
@@ -118,7 +121,7 @@
 
 .btn--danger:hover:not(:disabled) {
   background: var(--danger);
-  filter: brightness(0.93);
+  filter: brightness(1.1);
 }
 
 /* =================================================================== field */
@@ -142,7 +145,9 @@
   padding-inline: var(--space-3);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  /* A well, not a raised plane. An input lighter than the card it sits on is
+     the classic dark-mode "why is my form floating" bug. */
+  background: var(--sunken);
   color: var(--ink);
   font-family: inherit;
   font-size: var(--text-body);
@@ -175,7 +180,7 @@
 }
 
 .choice:hover {
-  background: var(--sunken);
+  background: var(--raised);
 }
 
 .choice__input {
@@ -210,7 +215,7 @@
   padding: var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--danger-tint);
-  color: var(--danger);
+  color: var(--danger-ink);
   font-size: var(--text-caption);
 }
 
@@ -263,7 +268,7 @@
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
-  background: var(--sunken);
+  background: var(--raised);
   color: var(--ink-muted);
 }
 
@@ -359,10 +364,20 @@
  * would leave nothing to look at first — and the report screen's job is to end
  * on "Run it back".
  */
+/*
+ * The track drops from --hairline-strong to --hairline on the dark surface.
+ *
+ * The bar's whole meaning is that a weak trait renders as an UNFILLED track,
+ * never a red fill. On paper the track was darker than the card, so an empty
+ * bar read as empty. Inverted, --hairline-strong is lighter than the card and a
+ * short bar starts to read as "filled with grey" — which quietly reintroduces
+ * the judgement the design went out of its way to avoid. One rung down keeps
+ * the track visible as a container while letting the cream fill dominate.
+ */
 .score-bar__track {
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--hairline-strong);
+  background: var(--hairline);
   overflow: hidden;
 }
 
@@ -378,12 +393,20 @@
 .sheet__backdrop {
   position: fixed;
   inset: 0;
-  background: oklch(0.255 0.014 70 / 0.32);
+  background: var(--scrim);
   animation: sheet-backdrop-in var(--dur-slow) var(--ease-enter);
 }
 
+/*
+ * Three things separate this panel from the page, and the hairline is the one
+ * doing the work. Scrim + panel on a near-black canvas tops out around 1.25:1
+ * however dark the scrim gets — a darkening overlay has nothing left to darken.
+ * So the panel steps UP to --raised and takes a visible edge.
+ */
 .sheet__panel {
-  background: var(--surface);
+  background: var(--raised);
+  border: 1px solid var(--hairline);
+  border-bottom: none;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   box-shadow: var(--shadow-modal);
   animation: sheet-panel-in var(--dur-slow) var(--ease-enter);
@@ -454,10 +477,13 @@
 }
 
 /* =================================================================== stage
- * The dark, full-bleed surface the hero sits on.
+ * The hero surface.
  *
- * Deliberately scoped rather than global: this is one composed surface, not a
- * dark mode. Everything past the hero stays on paper.
+ * This used to be the only dark thing in the product and it got its drama from
+ * that contrast — a curtain against a paper page. The page is dark now, so the
+ * stage is two rungs deeper than the canvas rather than a different world, and
+ * its impact has to come from the shafts of light and the display type instead.
+ * The bottom edge is what stops it dissolving into the section beneath it.
  */
 
 .stage {
@@ -465,6 +491,7 @@
   overflow: hidden;
   background: var(--stage-deep);
   color: var(--stage-ink);
+  border-bottom: 1px solid var(--hairline);
 }
 
 /*
@@ -476,12 +503,17 @@
   position: absolute;
   inset: 0;
   background-color: var(--stage);
+  /*
+   * Three layers, not five. The fourth was a corner darkener at L 0.24, which
+   * on a paper-adjacent composition pulled the bottom-right down and now sits
+   * at almost exactly canvas lightness — it darkens nothing and reads as a
+   * smudge. The remaining shafts are lifted slightly, because they are now
+   * competing with a deeper plane rather than a mid one.
+   */
   background-image:
-    linear-gradient(107deg, oklch(0.62 0.13 55 / 0.5) 0%, transparent 34%),
-    linear-gradient(107deg, transparent 38%, oklch(0.55 0.12 50 / 0.42) 46%, transparent 58%),
-    linear-gradient(107deg, transparent 62%, oklch(0.46 0.1 48 / 0.36) 70%, transparent 82%),
-    radial-gradient(120% 90% at 22% 8%, oklch(0.7 0.14 60 / 0.4) 0%, transparent 62%),
-    radial-gradient(90% 80% at 88% 96%, oklch(0.24 0.05 50 / 0.9) 0%, transparent 70%);
+    linear-gradient(107deg, oklch(0.66 0.13 55 / 0.52) 0%, transparent 34%),
+    linear-gradient(107deg, transparent 38%, oklch(0.58 0.12 50 / 0.44) 46%, transparent 58%),
+    radial-gradient(120% 90% at 22% 8%, oklch(0.72 0.14 60 / 0.38) 0%, transparent 62%);
   background-size: cover;
   background-position: center;
 }
@@ -490,10 +522,26 @@
   background-image: var(--stage-photo);
 }
 
-/* Keeps the type legible over whatever ends up behind it. */
+/*
+ * Keeps the type legible over whatever ends up behind it.
+ *
+ * Tuned for a photograph. With the built composition it now double-darkens an
+ * already-dark plane, so the alphas drop by roughly half here and the original
+ * strength is restored only when there is actually a photo to fight.
+ */
 .stage__scrim {
   position: absolute;
   inset: 0;
+  background: linear-gradient(
+    to bottom,
+    oklch(0.12 0.01 60 / 0.22) 0%,
+    oklch(0.12 0.01 60 / 0.08) 40%,
+    oklch(0.12 0.01 60 / 0.32) 100%
+  );
+}
+
+.stage__backdrop--photo ~ .stage__scrim,
+.stage__backdrop--photo + .stage__scrim {
   background: linear-gradient(
     to bottom,
     oklch(0.12 0.01 60 / 0.45) 0%,
@@ -503,13 +551,17 @@
 }
 
 /*
- * The display type. Very light weight at very large size — the contrast
- * between hairline letterforms and a heavy photograph is the whole effect,
- * and any more weight collapses it.
+ * The display type. Light weight at very large size — the contrast between
+ * hairline letterforms and a heavy photograph is the whole effect, and any
+ * more weight collapses it.
+ *
+ * 350 rather than 300: light-on-dark strokes lose more apparent weight than
+ * dark-on-light ones, and at 300 the words had started to disappear into the
+ * backdrop rather than sitting on it.
  */
 .stage__word {
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 350;
   line-height: 0.82;
   letter-spacing: -0.03em;
   color: var(--stage-ink);

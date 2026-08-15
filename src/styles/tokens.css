@@ -1,8 +1,8 @@
 /*
  * On Air — design tokens
  * ----------------------
- * A warm paper-bright studio: one hot accent, one live-green signal light,
- * hairline structure instead of shadows, motion that only confirms state changes.
+ * A warm dark studio: one hot accent, one live-green signal light, hairline
+ * structure instead of shadows, motion that only confirms state changes.
  *
  * OKLCH is authoritative. Hex in comments is the approximate sRGB fallback and
  * exists so designers can eyedrop it — it is not used by the stylesheet.
@@ -11,84 +11,142 @@
  *   1. One accent per screen. If two things are Clementine, one of them is wrong.
  *   2. A neutral canvas carries >=85% of pixels.
  *   3. Green means live. Blue means partner. Red means destructive. Forever.
- *   4. No gradients. Single exception: the waveform may ramp chroma within one hue.
- *   5. Dark mode ships in v1.1 as a real inversion, not a filter.
+ *   4. No gradients. Two exceptions: the waveform may ramp chroma within one
+ *      hue, and the stage backdrop composes light shafts.
+ *   5. The product is dark. One surface family, no light mode, no toggle.
+ *      Chroma ceiling 0.19 — that is the rule which keeps this from becoming
+ *      a neon dark theme, and it is enforceable by reading this file.
+ *
+ * WHY THE NAMES LOOK WRONG
+ * `--ink` is cream and `--surface` is darker than white. The names describe
+ * ROLE, not lightness: ink is what you read, surface is what a card sits on,
+ * sunken still recedes and raised still elevates. Renaming them would churn
+ * ~200 call sites to buy nothing.
+ *
+ * Every ratio below is measured, not estimated. Re-run
+ * `node scripts/contrast-audit.mjs` against a dev server after any change here.
  */
 
 :root {
   /* ---------------------------------------------------------------- neutrals
-   * Warm sand ramp. Tinted toward the accent hue (70deg) so the neutrals and
-   * the accent feel like one family rather than two unrelated palettes.
+   * One continuous warm ladder, hue 60-85, chroma 0.010-0.016. The stage is
+   * the two darkest rungs of the SAME family rather than a separate palette.
+   *
+   * Lifted off absolute black on purpose: pure #000 under cream type is the
+   * halation trap. Steps are sized in OKLCH L (perceptually uniform) because
+   * sRGB luminance is crushed down here — adjacent rungs measure only ~1.1:1
+   * in WCAG terms even when they read as clearly distinct.
    */
-  --canvas: oklch(0.98 0.004 70); /* #FAF9F6 — page background */
-  --surface: oklch(1 0 0); /* #FFFFFF — cards, call panel, sheets */
-  --sunken: oklch(0.96 0.005 70); /* #F3F1ED — wells, transcript area */
-  --hairline: oklch(0.905 0.007 70); /* #E3DFD8 — 1px borders: the primary structure */
-  --hairline-strong: oklch(0.845 0.009 70); /* #CFC9BF — dividers, unfilled score track */
+  --stage-deep: oklch(0.115 0.01 60); /* #070403 — the floor */
+  --stage: oklch(0.155 0.012 60); /* #100B07 — hero surface */
+  --sunken: oklch(0.165 0.012 60); /* #120D09 — wells, transcript, inputs */
+  --canvas: oklch(0.205 0.013 60); /* #1C1611 — page background */
+  --surface: oklch(0.25 0.014 60); /* #27201B — cards, call panel */
+  --raised: oklch(0.295 0.015 60); /* #322B25 — sheets, popovers, hovers */
+  --hairline: oklch(0.345 0.015 60); /* #3F3832 — 1px borders: the primary structure */
+  --hairline-strong: oklch(0.44 0.016 60); /* #59514A — dividers, unfilled score track */
 
   /*
    * --ink-subtle clears 3:1 but NOT 4.5:1, so it is never text a user has to
    * read: disabled controls, decorative rules, and placeholder marks only.
+   * That gap is load-bearing — if it ever clears 4.5 the rule stops being
+   * enforceable by measurement, so the audit bounds it from ABOVE too.
    * --ink-muted is the lightest ink allowed on real copy.
+   *
+   * --ink stops at L 0.945 rather than pure white. High light-on-dark contrast
+   * smears for readers with astigmatism, and 15:1 is already past comfortable.
    */
-  --ink-subtle: oklch(0.64 0.012 70); /* #8E877C — disabled, decorative */
-  --ink-muted: oklch(0.51 0.014 70); /* #6A6359 — secondary body, smallest readable ink */
-  --ink: oklch(0.255 0.014 70); /* #2A2521 — primary text. Warm near-black, never #000 */
+  --ink-subtle: oklch(0.585 0.014 70); /* #817A73 — 3.81:1 on surface. Never copy. */
+  --ink-muted: oklch(0.735 0.014 80); /* #AEA8A0 — 6.82:1 on surface */
+  --ink: oklch(0.945 0.01 85); /* #F0ECE5 — 13.65:1 on surface. Cream, never #FFF */
 
   /* ----------------------------------------------------------------- accent
    * "Clementine". The single high-chroma hue. Exactly one job per screen:
    * the primary action.
    *
-   * Two steps, and the reason is contrast, not decoration. A mid-bright orange
-   * fails 4.5:1 against BOTH white and near-black, so no single value can both
-   * carry a button label and stay vivid. So:
+   * Still two steps, but the reason changed with the surface. On paper a
+   * mid-bright orange failed 4.5:1 against both white and near-black, so no
+   * single value could carry a label AND stay vivid. On dark the accent clears
+   * 3:1 on its own, so --accent-bright is now about vividness for rails and
+   * marks rather than about escaping a contrast trap.
    *
-   *   --accent         carries text. White on it clears 4.5:1. Buttons only.
+   *   --accent         carries text. Near-black on it clears 4.5:1. Buttons only.
    *   --accent-bright  carries no text, ever. Topic rail, brand mark, waveform.
-   *                    Clears 3:1 against the canvas as a UI component.
-   *
-   * Measured, not estimated — see the contrast audit in the verification notes.
+   *   --accent-press   hover LIGHTENS on a dark surface. Darkening reads as
+   *                    "receding", which is the wrong answer to a hover.
    */
-  --accent: oklch(0.575 0.17 45); /* #C94A00 — white label at 4.71:1 */
-  --accent-press: oklch(0.51 0.155 43); /* hover / pressed on fill */
-  --accent-bright: oklch(0.645 0.18 45); /* #E16113 — marks and rails, never text */
-  --accent-ink: oklch(0.455 0.145 41); /* #A24118 — accent as TEXT, 7.34:1 on canvas */
-  --accent-tint: oklch(0.955 0.032 55); /* #FDEDE2 — selected row, topic-card wash */
-  --on-accent: oklch(1 0 0); /* #FFFFFF — text on accent fill */
+  --accent: oklch(0.66 0.16 45); /* #DF6C32 — near-black label at 5.72:1 */
+  --accent-press: oklch(0.72 0.15 45); /* #F0834E — hover / pressed on fill */
+  --accent-bright: oklch(0.74 0.155 45); /* #F98751 — marks and rails, never text */
+  --accent-ink: oklch(0.78 0.13 50); /* #FA9D68 — accent as TEXT, 7.71:1 on surface */
+  --accent-tint: oklch(0.305 0.048 45); /* #43271A — selected row, topic-card wash */
+
+  /*
+   * FLIPPED. --accent had to get bright enough to read as a UI element on a
+   * dark page, and white on it measures 3.30:1 — a fail. Near-black is 5.72:1.
+   * The token name still means "text on the accent fill"; only the value moved.
+   */
+  --on-accent: oklch(0.18 0.03 45); /* #1C0D06 */
 
   /* ---------------------------------------------------------------- stage
-   * The dark surface the hero lives on.
+   * The hero surface. --stage and --stage-deep are real values above, in the
+   * neutral ladder. Everything else here is an alias.
    *
-   * A separate set rather than a dark-mode inversion of the light palette:
-   * this is one deliberate full-bleed surface, not the whole product turned
-   * inside out. The rest of the app stays on paper.
+   * These names survive because components.css, HeroPresence and
+   * e2e/landing.mjs all reference them. What does NOT survive is a second ink
+   * ramp and a second orange: Claude orange sat 1.12:1 from Clementine on the
+   * same background, which is two indistinguishable high-chroma accents on one
+   * screen — banned by rule 1. It was only ever defensible while the stage was
+   * a foreign surface. The whole product is that surface now.
    */
-  --stage: oklch(0.17 0.012 60); /* near-black, warm */
-  --stage-deep: oklch(0.12 0.01 60);
-  --stage-ink: oklch(0.93 0.012 85); /* cream — 14:1 on the stage */
-  --stage-ink-dim: oklch(0.74 0.014 85);
-  --stage-hairline: oklch(0.93 0.012 85 / 0.32);
-  /* Claude orange — the stage's highlight. Hover, live state, nothing else. */
-  --stage-accent: oklch(0.685 0.115 40); /* ~#D97757 */
+  --stage-ink: var(--ink);
+  --stage-ink-dim: var(--ink-muted);
+  --stage-hairline: oklch(0.945 0.01 85 / 0.32); /* ink at 32%, ~2.7:1 composited */
+  --stage-accent: var(--accent-bright);
+
+  /* Scrim for anything that must sit over content. Based on black, not on ink. */
+  --scrim: oklch(0.06 0.008 60 / 0.72);
 
   /* ----------------------------------------------------------------- signal
    * Semantic only. Never decorative. Never a fourth brand color.
    * Each of these has exactly one meaning and may not be reused for another.
+   *
+   * Re-derived for a dark surface rather than reused, because every one of
+   * these was tuned against paper:
+   *   - the base value gets BRIGHTER, to clear 3:1 against a dark card
+   *   - `-tint` inverts from a pale wash to a low-chroma DARK wash. Chroma goes
+   *     up slightly: at low lightness you need more of it to read as a hue.
+   *   - `-ink` gets LIGHTER, and loses a little chroma so light chromatic text
+   *     does not read as neon.
    */
-  --live: oklch(0.615 0.15 155); /* #009F59 — connected / on-air / your turn. 3.44:1 on surface */
-  --live-tint: oklch(0.955 0.03 155); /* #E6F6ED — live badge background */
-  --live-ink: oklch(0.44 0.115 155); /* live as TEXT on light */
+  --live: oklch(0.72 0.16 155); /* #35C177 — connected / on-air / your turn. 6.91:1 on surface */
+  --live-tint: oklch(0.3 0.048 155); /* #183523 — live badge background */
+  --live-ink: oklch(0.82 0.14 155); /* #71DF9C — live as TEXT */
 
-  --partner: oklch(0.585 0.13 245); /* #3C74C4 — the other person, always */
-  --partner-tint: oklch(0.96 0.025 245); /* their transcript lines, their tile */
-  --partner-ink: oklch(0.45 0.13 245); /* partner as TEXT on light */
+  --partner: oklch(0.7 0.12 245); /* #58A5E4 — the other person, always */
+  --partner-tint: oklch(0.31 0.05 250); /* #1C3249 — their transcript lines, their tile */
+  --partner-ink: oklch(0.8 0.1 245); /* #86C5FA — partner as TEXT */
 
-  --warn: oklch(0.64 0.14 78); /* #BB7E00 — weak connection, time running out. 3.44:1 on surface */
-  --warn-tint: oklch(0.965 0.03 85);
-  --warn-ink: oklch(0.5 0.115 70);
+  /*
+   * Hue pushed 78 -> 88. On paper warn and the accent were separated by
+   * lightness as well as hue; on dark they land at nearly the same L, and the
+   * call screen can show a warn badge next to an accent-bright speaking ring.
+   * The extra 10 degrees is what keeps them tellable apart.
+   */
+  --warn: oklch(0.78 0.14 88); /* #DDB13A — weak connection, time running out. 7.97:1 on surface */
+  --warn-tint: oklch(0.315 0.045 80); /* #3E2F15 */
+  --warn-ink: oklch(0.85 0.13 85); /* #F5C761 */
 
-  --danger: oklch(0.545 0.195 22); /* #C42B33 — destructive / leave / report ONLY */
-  --danger-tint: oklch(0.96 0.025 22);
+  --danger: oklch(0.65 0.19 25); /* #ED5350 — destructive / leave / report ONLY */
+  --danger-tint: oklch(0.305 0.065 25); /* #4B201E */
+  /*
+   * New, and it exists because the conversion surfaced a real failure: --danger
+   * used as TEXT on --danger-tint measures 4.06:1, which fails the body floor
+   * in .form-error and .btn--danger-ghost. Chroma is capped at 0.14 rather than
+   * 0.16 because anything higher falls outside sRGB at this lightness and the
+   * browser gamut-maps it somewhere we did not choose.
+   */
+  --danger-ink: oklch(0.76 0.14 25); /* #FE8B83 — 6.05:1 on the tint */
 
   /* ------------------------------------------------------------- typography
    * Switzer: neutral grotesque, slightly humanist terminals. Structured enough
@@ -190,10 +248,14 @@
    * Exactly two exist. Everything else gets a 1px hairline plus a surface
    * tint step — the border-first method (Vercel / Linear / Stripe).
    * Cards at rest never get a shadow.
+   *
+   * Based on black at high alpha, not on warm ink at 6%. A shadow tinted with
+   * the ink colour was legible on paper and is literally invisible here, which
+   * is also why --raised exists: on a dark page, elevation has to be carried by
+   * a lighter surface and a hairline, with the shadow only deepening it.
    */
-  --shadow-pop:
-    0 1px 2px oklch(0.255 0.014 70 / 0.06), 0 6px 16px oklch(0.255 0.014 70 / 0.07);
-  --shadow-modal: 0 12px 48px oklch(0.255 0.014 70 / 0.16);
+  --shadow-pop: 0 1px 2px oklch(0 0 0 / 0.4), 0 6px 16px oklch(0 0 0 / 0.44);
+  --shadow-modal: 0 12px 48px oklch(0 0 0 / 0.62);
 
   /* ----------------------------------------------------------------- motion
    * The complete list of what is allowed to move lives in README.md.
@@ -216,6 +278,12 @@
    */
   --focus-width: 2px;
   --focus-offset: 2px;
+  /*
+   * Self-heals into a cream ring on the dark surface, which is correct — do not
+   * "fix" it to the accent. Ink on an accent fill is only 2.81:1, but the 2px
+   * offset puts the ring on the canvas behind the control (15.28:1), so the
+   * pairing that actually gets rendered clears the floor comfortably.
+   */
   --focus-color: var(--ink);
 }
 

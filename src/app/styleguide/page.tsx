@@ -14,12 +14,14 @@ type Swatch = {
   token: string;
   role: string;
   className: string;
-  isDark?: boolean;
 };
 
 const NEUTRALS: Swatch[] = [
   { token: "--canvas", role: "Page background", className: "bg-canvas" },
+  { token: "--stage-deep", role: "Hero floor", className: "bg-stage-deep" },
+  { token: "--stage", role: "Hero surface", className: "bg-stage" },
   { token: "--surface", role: "Cards, call panel", className: "bg-surface" },
+  { token: "--raised", role: "Sheets, popovers, hovers", className: "bg-raised" },
   { token: "--sunken", role: "Wells, transcript", className: "bg-sunken" },
   { token: "--hairline", role: "1px borders", className: "bg-hairline" },
   {
@@ -31,19 +33,16 @@ const NEUTRALS: Swatch[] = [
     token: "--ink-subtle",
     role: "Timestamps, disabled",
     className: "bg-ink-subtle",
-    isDark: true,
   },
   {
     token: "--ink-muted",
     role: "Secondary body",
     className: "bg-ink-muted",
-    isDark: true,
   },
   {
     token: "--ink",
     role: "Primary text (warm near-black)",
     className: "bg-ink",
-    isDark: true,
   },
 ];
 
@@ -52,13 +51,11 @@ const SIGNALS: Swatch[] = [
     token: "--accent",
     role: "Primary action. Carries text. One per screen.",
     className: "bg-accent",
-    isDark: true,
   },
   {
     token: "--accent-bright",
     role: "Rails, marks, waveform. Never text.",
     className: "bg-accent-bright",
-    isDark: true,
   },
   {
     token: "--accent-tint",
@@ -69,13 +66,11 @@ const SIGNALS: Swatch[] = [
     token: "--live",
     role: "Connected / on-air. Only green.",
     className: "bg-live",
-    isDark: true,
   },
   {
     token: "--partner",
     role: "The other person. Always.",
     className: "bg-partner",
-    isDark: true,
   },
   {
     token: "--warn",
@@ -86,7 +81,29 @@ const SIGNALS: Swatch[] = [
     token: "--danger",
     role: "Destructive only",
     className: "bg-danger",
-    isDark: true,
+  },
+  /*
+   * The -ink and -tint halves of each semantic. On paper these were pale
+   * washes and dark text and nobody needed to see them side by side; inverted,
+   * a tint is a dark wash that carries ordinary body copy, so the pairing is
+   * now something a reviewer has to be able to check.
+   */
+  { token: "--live-ink", role: "Live AS TEXT", className: "bg-live-ink" },
+  { token: "--live-tint", role: "Live badge wash", className: "bg-live-tint" },
+  { token: "--partner-ink", role: "Partner AS TEXT", className: "bg-partner-ink" },
+  { token: "--partner-tint", role: "Partner tile wash", className: "bg-partner-tint" },
+  { token: "--warn-ink", role: "Warn AS TEXT", className: "bg-warn-ink" },
+  { token: "--warn-tint", role: "Warn badge wash", className: "bg-warn-tint" },
+  {
+    token: "--danger-ink",
+    role: "Danger AS TEXT — --danger fails 4.5:1 on its own tint",
+    className: "bg-danger-ink",
+  },
+  { token: "--danger-tint", role: "Danger wash", className: "bg-danger-tint" },
+  {
+    token: "--on-accent",
+    role: "Label on an accent fill. Near-black, not white.",
+    className: "bg-on-accent",
   },
 ];
 
@@ -439,10 +456,16 @@ function SwatchGrid({ swatches }: { swatches: Swatch[] }) {
       {swatches.map((swatch) => (
         <div
           key={swatch.token}
-          className="flex items-center gap-4 rounded-md border border-hairline bg-surface p-3"
+          className="flex items-center gap-4 rounded-md border border-hairline bg-stage-deep p-3"
         >
+          {/*
+           * The swatch sits on --stage-deep behind a --hairline-strong ring.
+           * On a --surface card behind a --hairline ring the bottom five rungs
+           * of the neutral ladder were invisible — which is exactly the part of
+           * the palette a reviewer most needs to see separated.
+           */}
           <div
-            className={`size-12 shrink-0 rounded-xs border border-hairline ${swatch.className}`}
+            className={`size-12 shrink-0 rounded-xs border border-hairline-strong ${swatch.className}`}
           />
           <div className="min-w-0">
             <p className="tabular t-caption text-ink">{swatch.token}</p>

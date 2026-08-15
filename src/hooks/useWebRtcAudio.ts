@@ -25,6 +25,9 @@ type SignalPayload =
   | { kind: "answer"; sdp: string; nid: string }
   | { kind: "ice"; candidate: RTCIceCandidateInit; nid: string };
 
+/** How long to wait for an answer before assuming the re-offer was lost. */
+const RENEGOTIATION_TIMEOUT_MS = 8_000;
+
 type Options = {
   /** Exactly one side offers. The server decides, to avoid glare. */
   isOfferer: boolean;
@@ -121,7 +124,35 @@ export function useWebRtcAudio({
    */
   const wantsRenegotiation = useRef(false);
 
+  /**
+   * The renegotiation lock, and the reason video never worked.
+   *
+   * `signalingState` is NOT a lock. It stays "stable" across `createOffer()`
+   * and only flips on `setLocalDescription()`, so two calls landing in that
+   * window both read "stable" and both proceed. On mutual opt-in that is
+   * exactly what happened: the offerer re-offered once for its own accept and
+   * once for the peer's `video-renegotiate`, microseconds apart. Two offers
+   * went out, `negotiationIdRef` was overwritten twice, and the peer's answers
+   * were then discarded — the first by the id check, the second by the
+   * `have-local-offer` check. The connection parked in `have-local-offer` with
+   * `wantsRenegotiation` already cleared, so the deferred retry never fired.
+   * Senders existed on both sides and not one frame moved.
+   *
+   * This flag is set synchronously BEFORE the first await, which is the whole
+   * point of it.
+   */
+  const isNegotiating = useRef(false);
+
+  /** Cleared when the exchange completes; fires if the answer never arrives. */
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const close = useCallback(() => {
+    if (watchdogRef.current) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+    isNegotiating.current = false;
+    wantsRenegotiation.current = false;
     videoSenderRef.current = null;
     setLocalVideo((current) => {
       current?.getTracks().forEach((track) => track.stop());
@@ -167,8 +198,33 @@ export function useWebRtcAudio({
       peer.addTrack(track, localStream);
     }
 
+    /*
+     * Remote tracks accumulate; they do not replace each other.
+     *
+     * This used to be `setRemoteStream(event.streams[0])`, and `enableVideo`
+     * publishes the camera under its OWN MediaStream — so the moment a remote
+     * video track arrived, the remote stream was swapped for a video-only one.
+     * CallView binds the audio element to that same stream, so accepting video
+     * silently killed the audio and flatlined the partner's waveform. Worse, an
+     * m-line arriving with no msid gave `event.streams[0] === undefined` and
+     * wiped the stream entirely.
+     *
+     * A fresh MediaStream wrapper per event, over the same track objects, is
+     * what makes the identity change so React's effects re-bind. The tracks
+     * themselves are untouched, so no media is interrupted.
+     */
+    const remoteTracks = new Set<MediaStreamTrack>();
+    const publishRemote = () => setRemoteStream(new MediaStream([...remoteTracks]));
+
     peer.addEventListener("track", (event) => {
-      setRemoteStream(event.streams[0] ?? null);
+      remoteTracks.add(event.track);
+      publishRemote();
+
+      event.track.addEventListener("ended", () => {
+        remoteTracks.delete(event.track);
+        publishRemote();
+      });
+
       if (event.track.kind === "video") {
         setHasRemoteVideo(true);
         // A camera switched off arrives as the track ending, not as a new
@@ -194,6 +250,18 @@ export function useWebRtcAudio({
 
     peer.addEventListener("signalingstatechange", () => {
       if (peer.signalingState !== "stable") return;
+
+      /*
+       * Back to stable means the exchange completed. Release the lock and kill
+       * the watchdog BEFORE replaying anything, or the replay locks itself out
+       * and then gets torn down by its predecessor's timer.
+       */
+      isNegotiating.current = false;
+      if (watchdogRef.current) {
+        clearTimeout(watchdogRef.current);
+        watchdogRef.current = null;
+      }
+
       if (!wantsRenegotiation.current) return;
       // Deferred a tick: re-offering from inside the state-change handler can
       // land before the browser considers the previous exchange finished.
@@ -243,41 +311,60 @@ export function useWebRtcAudio({
     async (peer: RTCPeerConnection, payload: unknown) => {
       if (!isSignalPayload(payload)) return;
 
-      if (payload.kind === "offer") {
-        // The answerer adopts whichever negotiation the latest offer names.
-        negotiationIdRef.current = payload.nid;
-        pendingCandidates.current = [];
+      try {
+        if (payload.kind === "offer") {
+          // The answerer adopts whichever negotiation the latest offer names.
+          negotiationIdRef.current = payload.nid;
+          pendingCandidates.current = [];
 
-        await peer.setRemoteDescription({ type: "offer", sdp: payload.sdp });
+          await peer.setRemoteDescription({ type: "offer", sdp: payload.sdp });
 
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-        sendSignalRef.current({
-          kind: "answer",
-          sdp: answer.sdp ?? "",
-          nid: payload.nid,
-        });
-        return;
-      }
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          sendSignalRef.current({
+            kind: "answer",
+            sdp: answer.sdp ?? "",
+            nid: payload.nid,
+          });
 
-      // Anything else belonging to a negotiation we have moved on from is
-      // stale by definition. Applying it is what leaves a peer stuck in
-      // "checking" while the other side reports "connected".
-      if (payload.nid !== negotiationIdRef.current) return;
-
-      if (payload.kind === "answer") {
-        if (peer.signalingState !== "have-local-offer") return;
-        await peer.setRemoteDescription({ type: "answer", sdp: payload.sdp });
-        await drainCandidates(peer, pendingCandidates.current);
-        return;
-      }
-
-      if (payload.kind === "ice") {
-        if (!peer.remoteDescription) {
-          pendingCandidates.current.push(payload.candidate);
+          /*
+           * The answering side queues candidates too, and used to never drain
+           * them: this call only existed in the `answer` branch. Any candidate
+           * that arrived between the offer and the remote description being set
+           * was pushed onto the queue and abandoned, which costs connectivity
+           * on exactly the networks that need every candidate.
+           */
+          await drainCandidates(peer, pendingCandidates.current);
           return;
         }
-        await peer.addIceCandidate(payload.candidate);
+
+        // Anything else belonging to a negotiation we have moved on from is
+        // stale by definition. Applying it is what leaves a peer stuck in
+        // "checking" while the other side reports "connected".
+        if (payload.nid !== negotiationIdRef.current) return;
+
+        if (payload.kind === "answer") {
+          if (peer.signalingState !== "have-local-offer") return;
+          await peer.setRemoteDescription({ type: "answer", sdp: payload.sdp });
+          await drainCandidates(peer, pendingCandidates.current);
+          return;
+        }
+
+        if (payload.kind === "ice") {
+          if (!peer.remoteDescription) {
+            pendingCandidates.current.push(payload.candidate);
+            return;
+          }
+          await peer.addIceCandidate(payload.candidate);
+        }
+      } catch (error) {
+        /*
+         * One rejected setRemoteDescription used to reject straight out of the
+         * drain loop, abandoning every signal still queued behind it — a silent
+         * stall whose only trace was an unhandled rejection. A signal that
+         * cannot be applied is dropped; the ones behind it still get their turn.
+         */
+        console.warn("[webrtc] dropped a signal", payload.kind, error);
       }
     },
     [],
@@ -325,23 +412,56 @@ export function useWebRtcAudio({
     const peer = peerRef.current;
     if (!peer || !isOfferer) return;
 
-    if (peer.signalingState !== "stable") {
+    /*
+     * Both conditions matter. `signalingState` catches an exchange the browser
+     * has already committed to; `isNegotiating` catches the window before that
+     * where state still reads "stable" — see the ref's declaration.
+     */
+    if (isNegotiating.current || peer.signalingState !== "stable") {
       wantsRenegotiation.current = true;
       return;
     }
+
+    isNegotiating.current = true;
     wantsRenegotiation.current = false;
 
-    const negotiationId = crypto.randomUUID();
-    negotiationIdRef.current = negotiationId;
-    pendingCandidates.current = [];
+    /*
+     * A lost answer must not hold the lock forever. `signalingstatechange` is
+     * the normal release, but it only fires if the peer actually answers — and
+     * the request that triggers a re-offer is a fire-and-forget socket message
+     * with no ack. Without this, one dropped answer means video can never be
+     * negotiated again for the rest of the call.
+     */
+    if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    watchdogRef.current = setTimeout(() => {
+      if (!isNegotiating.current) return;
+      isNegotiating.current = false;
+      if (peerRef.current?.signalingState === "have-local-offer") {
+        wantsRenegotiation.current = true;
+        console.warn("[webrtc] no answer to the re-offer, retrying");
+        void renegotiateRef.current?.();
+      }
+    }, RENEGOTIATION_TIMEOUT_MS);
 
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    sendSignalRef.current({
-      kind: "offer",
-      sdp: offer.sdp ?? "",
-      nid: negotiationId,
-    });
+    try {
+      const negotiationId = crypto.randomUUID();
+      negotiationIdRef.current = negotiationId;
+      pendingCandidates.current = [];
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      sendSignalRef.current({
+        kind: "offer",
+        sdp: offer.sdp ?? "",
+        nid: negotiationId,
+      });
+    } catch (error) {
+      // Never hold the lock on a failed offer: nothing else can retry, and the
+      // camera is already attached, so the call would sit there mute forever.
+      isNegotiating.current = false;
+      wantsRenegotiation.current = true;
+      console.warn("[webrtc] renegotiation failed, will retry", error);
+    }
   }, [isOfferer]);
 
   useEffect(() => {
