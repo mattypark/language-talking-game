@@ -93,6 +93,7 @@ export async function createProfile(input: {
   levelBand: LevelBandId;
   firstLanguage: string;
   ageBand: AgeBandId;
+  tier?: "member" | "guest";
 }): Promise<Profile> {
   const profile: Profile = {
     id: randomUUID(),
@@ -104,6 +105,7 @@ export async function createProfile(input: {
     cohortIds: [],
     rulesAcceptedAt: null,
     trust: STARTING_TRUST,
+    tier: input.tier ?? "member",
     createdAt: new Date().toISOString(),
   };
 

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { LiveSession } from "@/components/live/LiveSession";
 import { getCurrentProfile, nextOnboardingStep } from "@/lib/auth";
 import { ANY_TOPIC, isTargetLanguage } from "@/lib/domain";
+import { mintQueueToken } from "@/lib/queue-token";
+import { isGuest } from "@/lib/tiers";
 
 export const metadata = { title: "Practising · On Air" };
 
@@ -38,7 +40,14 @@ export default async function LivePage({
 
   return (
     <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col px-5 py-8">
+      {/*
+       * Minted here, from the stored profile, on the server. This is the only
+       * place identity is asserted — the browser carries the token and cannot
+       * author one.
+       */}
       <LiveSession
+        queueToken={mintQueueToken(profile)}
+        isGuest={isGuest(profile)}
         profile={{
           id: profile.id,
           displayName: profile.displayName,

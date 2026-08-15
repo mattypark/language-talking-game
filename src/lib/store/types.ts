@@ -9,6 +9,20 @@ export type Profile = {
   ageBand: AgeBandId;
   /** Cohort rings this person may be matched inside. */
   cohortIds: string[];
+  /**
+   * What this account is allowed to keep.
+   *
+   * A guest can hold a real conversation — that half of the product needs no
+   * account and gating it would only make the queue thinner. What a guest does
+   * not get is the report, the history, or a recording: scoring means their
+   * voice is uploaded and retained, and there is nowhere durable to put a
+   * report they can come back to. So a guest's microphone never leaves their
+   * machine, which is also the honest privacy answer rather than a paywall.
+   *
+   * Optional so profiles written before this existed still parse; absent means
+   * "member", because everyone who had an account before had a full one.
+   */
+  tier?: "member" | "guest";
   /** Community rules must be accepted before a first match, not after. */
   rulesAcceptedAt: string | null;
   /**

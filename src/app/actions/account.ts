@@ -77,6 +77,49 @@ export async function createAccount(
   redirect("/rules");
 }
 
+/**
+ * Start as a guest.
+ *
+ * The age band is still asked for, and it is still a hard constraint — being a
+ * guest changes what you keep, never who you are matched with. Everything else
+ * is defaulted, because the point of this path is that there is nothing to
+ * fill in: a guest is here to find out whether talking to a stranger in a
+ * foreign language is bearable, and four questions is the wrong price for that.
+ *
+ * Rules are accepted by taking this path, for the same reason a member has to
+ * accept them: the person on the other end agreed to them too.
+ */
+export async function createGuest(
+  _previous: FormResult,
+  formData: FormData,
+): Promise<FormResult> {
+  const ageBand = formData.get("ageBand");
+  if (!isAgeBandId(ageBand)) {
+    return { error: "Tell us which age group you're in." };
+  }
+
+  const targetLanguageRaw = formData.get("targetLanguage");
+  const targetLanguage = isTargetLanguage(targetLanguageRaw)
+    ? targetLanguageRaw
+    : TARGET_LANGUAGES[0].code;
+
+  const profile = await createProfile({
+    displayName: "Guest",
+    targetLanguage,
+    levelBand: "intermediate",
+    firstLanguage: "Other",
+    ageBand,
+    tier: "guest",
+  });
+
+  await updateProfile(profile.id, {
+    rulesAcceptedAt: new Date().toISOString(),
+  });
+
+  await setSession(profile.id);
+  redirect("/cohort");
+}
+
 export async function acceptRules(): Promise<void> {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/join");

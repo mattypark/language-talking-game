@@ -22,6 +22,12 @@ import {
 
 type Props = {
   profile: QueueProfile;
+  queueToken: string;
+  /**
+   * Guests practise but are never recorded. Enforced on the server too — this
+   * is so the recorder never runs, not so the API is trusted to say no.
+   */
+  isGuest: boolean;
   matchmakerUrl: string;
   stunUrls: string[];
   /** What they chose on the room screen. */
@@ -40,6 +46,8 @@ const COUNTDOWN_SECONDS = 3;
  */
 export function LiveSession({
   profile,
+  queueToken,
+  isGuest,
   matchmakerUrl,
   stunUrls,
   language,
@@ -95,6 +103,7 @@ export function LiveSession({
 
   const matchmaker = useMatchmaker({
     profile,
+    queueToken,
     url: matchmakerUrl,
     onSignal: handleSignal,
     onPeerLeft: handlePeerLeft,
@@ -327,10 +336,12 @@ export function LiveSession({
       }
     }
 
-    recorder.start(stream);
+    // A guest's audio never leaves their machine, so there is nothing to start.
+    if (!isGuest) recorder.start(stream);
+
     setIsCallOpen(true);
     setCallStartedAt(Date.now());
-  }, [mic, matchmaker.state, recorder]);
+  }, [mic, matchmaker.state, recorder, isGuest]);
 
   if (matchmaker.state.errorMessage) {
     return (

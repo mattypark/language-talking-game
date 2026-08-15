@@ -4,6 +4,7 @@ import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import WebSocket from "ws";
+import { createHmac } from "node:crypto";
 
 /**
  * Integration test against the real process, spawned as a child.
@@ -74,15 +75,42 @@ function connect() {
   };
 }
 
-const profile = (id, overrides = {}) => ({
-  id,
-  displayName: id,
-  cohortIds: ["cohort-a"],
-  levelBand: "intermediate",
-  ageBand: "adult",
-  firstLanguage: "Spanish",
-  ...overrides,
-});
+/**
+ * Mints the same token the web server does.
+ *
+ * Deliberately reimplemented here rather than imported from src/token.js: the
+ * test should fail if the verifier changes shape, and importing the module
+ * under test to build its own input would hide exactly that.
+ */
+const SECRET = "onair-dev-insecure-do-not-ship";
+const b64 = (value) => Buffer.from(value).toString("base64url");
+
+const token = (id, overrides = {}, claimOverrides = {}) => {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    sub: id,
+    iss: "onair-web",
+    aud: "onair-matchmaker",
+    iat: now,
+    exp: now + 900,
+    onair: {
+      displayName: id,
+      cohortIds: ["cohort-a"],
+      levelBand: "intermediate",
+      ageBand: "adult",
+      firstLanguage: "Spanish",
+      targetLanguage: "en",
+      tier: "member",
+      ...overrides,
+    },
+    ...claimOverrides,
+  };
+
+  const body = `${b64(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${b64(
+    JSON.stringify(payload),
+  )}`;
+  return `${body}.${createHmac("sha256", SECRET).update(body).digest("base64url")}`;
+};
 
 before(async () => {
   child = spawn(process.execPath, [SERVER], {
@@ -114,13 +142,50 @@ describe("matchmaker server", () => {
     assert.equal(body.ok, true);
   });
 
-  it("refuses a malformed hello", async () => {
+  it("refuses a hello with no token", async () => {
     const client = connect();
     await client.open();
-    client.send("hello", { profile: { id: "nope" } });
+    client.send("hello", { profile: { id: "nope", ageBand: "under_18" } });
 
     const error = await client.next("error");
-    assert.equal(error.reason, "bad-profile");
+    assert.equal(error.reason, "bad-token");
+  });
+
+  /*
+   * The load-bearing one. A client asserting its own age band is exactly the
+   * attack the token exists to stop, and a forged signature must not get past
+   * the door — everything about minor/adult separation rests on this.
+   */
+  it("refuses a token it did not sign", async () => {
+    const client = connect();
+    await client.open();
+
+    const forged = token("mallory", { ageBand: "under_18" });
+    const tampered = `${forged.slice(0, -4)}AAAA`;
+    client.send("hello", { token: tampered });
+
+    const error = await client.next("error");
+    assert.equal(error.reason, "bad-token");
+  });
+
+  it("refuses an expired token", async () => {
+    const client = connect();
+    await client.open();
+
+    const past = Math.floor(Date.now() / 1000) - 60;
+    client.send("hello", { token: token("late", {}, { exp: past }) });
+
+    const error = await client.next("error");
+    assert.equal(error.reason, "bad-token");
+  });
+
+  it("refuses a token addressed to something else", async () => {
+    const client = connect();
+    await client.open();
+    client.send("hello", { token: token("elsewhere", {}, { aud: "not-us" }) });
+
+    const error = await client.next("error");
+    assert.equal(error.reason, "bad-token");
   });
 
   it("runs two people from queue to live call", async () => {
@@ -128,8 +193,8 @@ describe("matchmaker server", () => {
     const bob = connect();
     await Promise.all([alice.open(), bob.open()]);
 
-    alice.send("hello", { profile: profile("alice") });
-    bob.send("hello", { profile: profile("bob", { firstLanguage: "Korean" }) });
+    alice.send("hello", { token: token("alice") });
+    bob.send("hello", { token: token("bob", { firstLanguage: "Korean" }) });
     await Promise.all([alice.next("ready"), bob.next("ready")]);
 
     // First in waits.
@@ -186,8 +251,8 @@ describe("matchmaker server", () => {
     const dave = connect();
     await Promise.all([carol.open(), dave.open()]);
 
-    carol.send("hello", { profile: profile("carol") });
-    dave.send("hello", { profile: profile("dave", { firstLanguage: "Korean" }) });
+    carol.send("hello", { token: token("carol") });
+    dave.send("hello", { token: token("dave", { firstLanguage: "Korean" }) });
     await Promise.all([carol.next("ready"), dave.next("ready")]);
 
     carol.send("enqueue");

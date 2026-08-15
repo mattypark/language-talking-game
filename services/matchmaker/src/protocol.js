@@ -11,7 +11,12 @@
 
 /** Browser -> server. */
 export const ClientMessage = {
-  /** Identify. Must arrive before anything else. */
+  /**
+   * Identify. Must arrive before anything else.
+   *
+   * Carries `token`, not a profile. The server reads the profile out of
+   * verified claims — see src/token.js.
+   */
   HELLO: "hello",
   /** Join the queue. */
   ENQUEUE: "enqueue",

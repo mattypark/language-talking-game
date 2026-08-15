@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { GUEST_REFUSAL, isGuest } from "@/lib/tiers";
 import { scoreParticipant } from "@/lib/scoring/score";
 import { getReport } from "@/lib/store/demo-store";
 import type { Report } from "@/lib/scoring/types";
@@ -24,6 +25,16 @@ export async function POST(
   const profile = await getCurrentProfile();
   if (!profile) {
     return NextResponse.json({ error: "not-signed-in" }, { status: 401 });
+  }
+
+  /*
+   * The single chokepoint for report generation. A guest has no uploaded audio
+   * to score anyway — the recorder never runs for them — so this would fail
+   * further down with a confusing "not enough speech". Refusing here says the
+   * true thing instead.
+   */
+  if (isGuest(profile)) {
+    return NextResponse.json(GUEST_REFUSAL, { status: 403 });
   }
 
   const { sessionId } = await context.params;

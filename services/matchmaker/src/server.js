@@ -2,6 +2,11 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { Matchmaker } from "./matchmaker.js";
 import { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
+import {
+  IS_INSECURE_DEV_SECRET,
+  profileFromClaims,
+  verifyQueueToken,
+} from "./token.js";
 import { TOPICS, getTopic, pickTopic } from "./topics.js";
 
 /**
@@ -227,34 +232,34 @@ function confirmMatch(proposal) {
 }
 
 function handleHello(client, message) {
-  const profile = message.profile;
+  /*
+   * Identity comes from a signed token, never from the socket.
+   *
+   * This used to accept whatever profile object the browser sent, after a
+   * type check. That made every downstream guarantee decorative: a client
+   * could claim `ageBand: "under_18"` plus the school cohort's id and join the
+   * minors pool, and could claim someone else's id to hijack their live
+   * session inside the reconnect grace window. The type check confirmed the
+   * shape of a lie.
+   *
+   * The token is minted by the web server from a stored profile and signed.
+   * Every field below is read out of verified claims.
+   */
+  const claims = verifyQueueToken(message.token);
 
-  const isValid =
-    profile &&
-    typeof profile.id === "string" &&
-    typeof profile.displayName === "string" &&
-    Array.isArray(profile.cohortIds) &&
-    typeof profile.levelBand === "string" &&
-    typeof profile.ageBand === "string";
-
-  if (!isValid) {
+  if (!claims) {
     /*
      * Written straight to the socket, not through send(): the client is not in
      * the registry yet and has no profileId, so a lookup would silently drop
      * this and the browser would see a bare disconnect with no reason.
      */
-    client.socket.send(encode(ServerMessage.ERROR, { reason: "bad-profile" }));
+    client.socket.send(encode(ServerMessage.ERROR, { reason: "bad-token" }));
     client.socket.close();
     return;
   }
 
-  /*
-   * Demo-mode identity: the client asserts who it is.
-   *
-   * This MUST become a verified Supabase JWT before anything real runs on it.
-   * Everything downstream — the age-band separation above all — is only as
-   * trustworthy as this line, and right now it is not trustworthy at all.
-   */
+  const profile = profileFromClaims(claims);
+
   const existing = clients.get(profile.id);
   if (existing && existing !== client && existing.seq > client.seq) {
     // A newer connection from this profile already owns the session.
@@ -578,6 +583,14 @@ const sweeper = setInterval(sweep, SWEEP_INTERVAL_MS);
 
 httpServer.listen(PORT, () => {
   console.log(`matchmaker listening on :${PORT}`);
+  if (IS_INSECURE_DEV_SECRET) {
+    console.warn(
+      "\n  !! MATCHMAKER_JWT_SECRET is not set, so queue tokens are signed\n" +
+        "  !! with the published development secret. Anyone can mint one, which\n" +
+        "  !! means the minor/adult separation is NOT enforced. Set it before\n" +
+        "  !! a single real person uses this.\n",
+    );
+  }
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

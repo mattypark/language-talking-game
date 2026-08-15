@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { JoinForm } from "./JoinForm";
 import { FlowSpine } from "@/components/onboarding/FlowSpine";
+import { GuestStart } from "@/components/onboarding/GuestStart";
 import { getCurrentProfile, nextOnboardingStep } from "@/lib/auth";
 
 export const metadata = { title: "Set up · On Air" };
@@ -15,6 +16,7 @@ export default async function JoinPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-14">
       <FlowSpine current="setup" />
       <JoinForm />
+      <GuestStart />
     </main>
   );
 }

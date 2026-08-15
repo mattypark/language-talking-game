@@ -13,7 +13,8 @@ type Props = { sessionId: string };
 type LoadState =
   | { status: "working" }
   | { status: "ready"; report: Report }
-  | { status: "failed"; reason: string };
+  | { status: "failed"; reason: string }
+  | { status: "guest"; reason: string };
 
 /**
  * Long enough to outlast the server's wait for the partner's upload, so a
@@ -70,6 +71,16 @@ export function ReportView({ sessionId }: Props) {
           continue;
         }
 
+        /*
+         * Not a failure. Nothing went wrong and retrying will never help — the
+         * recording was deliberately never made. Showing "couldn't build your
+         * report" next to a Try again button would be a lie twice over.
+         */
+        if (response.status === 403 && body.error === "guest-tier") {
+          setState({ status: "guest", reason: body.detail ?? "" });
+          return;
+        }
+
         if (!response.ok || !body.report) {
           setState({
             status: "failed",
@@ -109,6 +120,23 @@ export function ReportView({ sessionId }: Props) {
         <p className="t-body text-ink-muted">
           Working through what you said. This takes a few seconds.
         </p>
+      </Card>
+    );
+  }
+
+  if (state.status === "guest") {
+    return (
+      <Card className="p-6">
+        <p className="t-title-3 mb-2">You practised. That part was real.</p>
+        <p className="t-body mb-5 text-ink-muted">{state.reason}</p>
+        <div className="flex gap-3">
+          <Link href="/join">
+            <Button variant="primary">Make an account</Button>
+          </Link>
+          <Link href="/practice">
+            <Button variant="ghost">Practise again</Button>
+          </Link>
+        </div>
       </Card>
     );
   }

@@ -10,6 +10,14 @@ import type { AgeBandId, LevelBandId } from "@/lib/domain";
  * a drift between them.
  */
 
+/**
+ * The profile the CLIENT holds, for rendering.
+ *
+ * Notably this is no longer what identifies anyone. The matchmaker takes a
+ * signed token and reads the same fields out of verified claims — see
+ * src/lib/queue-token.ts. This type exists so the UI can show a name and a
+ * band without a round trip; sending it would prove nothing.
+ */
 export type QueueProfile = {
   id: string;
   displayName: string;

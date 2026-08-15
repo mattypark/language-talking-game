@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { GUEST_REFUSAL, isGuest } from "@/lib/tiers";
 import { MAX_AUDIO_BYTES, audioKeyFor, saveAudio } from "@/lib/store/audio";
 import { attachParticipantAudio, getSession } from "@/lib/store/demo-store";
 
@@ -17,6 +18,15 @@ export async function POST(
   const profile = await getCurrentProfile();
   if (!profile) {
     return NextResponse.json({ error: "not-signed-in" }, { status: 401 });
+  }
+
+  /*
+   * A guest's microphone never reaches the server. The client already declines
+   * to record, so reaching this line means something is wrong — refuse rather
+   * than store audio there is no lawful basis or retention story for.
+   */
+  if (isGuest(profile)) {
+    return NextResponse.json(GUEST_REFUSAL, { status: 403 });
   }
 
   const { sessionId } = await context.params;

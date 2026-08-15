@@ -244,8 +244,21 @@ So, from v1:
 - **Audio only.** No video.
 - **Closed cohort rings** — invite-code or campus-scoped pools, not the open
   internet. Open random matching is a separate, later, deliberate decision.
-- **No anonymous accounts.**
+- **No anonymous accounts.** A guest tier exists and is not an exception to
+  this: a guest still declares an age band, is still matched under the same
+  separation, and still accepts the rules. What a guest gives up is the report,
+  the history, and being recorded at all — their microphone never leaves their
+  machine. "No report" and "no recording" are one decision, not a paywall.
 - **Age band is a hard matching constraint.** Minor and adult pools never mix.
+- **The matchmaker verifies a signed token; it does not believe the browser.**
+  It used to take a profile object off the socket, type-check it, and place
+  people on it — so a client could assert `ageBand: "under_18"` with a school
+  cohort's id and join the minors pool, or assert someone else's id and take
+  over their live session inside the reconnect window. Identity is now minted
+  server-side from a stored profile, signed (`MATCHMAKER_JWT_SECRET`), and read
+  only out of verified claims. The token is an HS256 JWT with `sub` as the
+  profile id specifically so a Supabase-issued one drops in without touching
+  the handshake, the client, or the tests.
 - Recording consent at join, with a visible indicator. Audio is deleted once the
   report is generated, unless a report has been filed.
 - Trust score with a shadow pool rather than pure bans — burner accounts make

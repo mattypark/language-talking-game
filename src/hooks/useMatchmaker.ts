@@ -52,6 +52,8 @@ const RECONNECT_DELAY_MS = 1500;
 
 type Options = {
   profile: QueueProfile;
+  /** Signed by the web server. The only thing the matchmaker will believe. */
+  queueToken: string;
   url: string;
   /** WebRTC signals are handled by the call layer, not here. */
   onSignal?: (payload: unknown) => void;
@@ -66,7 +68,13 @@ type Options = {
  * This is also why the queue and the call live under one route: navigating
  * between them would tear the socket down at the exact moment it matters.
  */
-export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
+export function useMatchmaker({
+  profile,
+  queueToken,
+  url,
+  onSignal,
+  onPeerLeft,
+}: Options) {
   const [state, setState] = useState<MatchmakerState>(INITIAL);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -89,12 +97,14 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
    * re-render came from, which is never where the bug is.
    */
   const profileRef = useRef(profile);
+  const queueTokenRef = useRef(queueToken);
 
   useEffect(() => {
     onSignalRef.current = onSignal;
     onPeerLeftRef.current = onPeerLeft;
     profileRef.current = profile;
-  }, [onSignal, onPeerLeft, profile]);
+    queueTokenRef.current = queueToken;
+  }, [onSignal, onPeerLeft, profile, queueToken]);
 
   const send = useCallback((event: ClientEvent) => {
     const socket = socketRef.current;
@@ -183,7 +193,9 @@ export function useMatchmaker({ profile, url, onSignal, onPeerLeft }: Options) {
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
-        socket.send(JSON.stringify({ type: "hello", profile: profileRef.current }));
+        socket.send(
+          JSON.stringify({ type: "hello", token: queueTokenRef.current }),
+        );
       });
 
       socket.addEventListener("message", (message) => {
