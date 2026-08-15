@@ -1,23 +1,57 @@
 import { cookies } from "next/headers";
 import { getProfile } from "@/lib/store/demo-store";
+import { IS_SUPABASE_CONFIGURED } from "@/lib/supabase/config";
+import { getSupabaseServerClient, getSupabaseUser } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/store/types";
 
 const SESSION_COOKIE = "onair_session";
 const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
 
 /**
- * Demo-mode session: a signed-out cookie holding the profile id.
+ * Who is signed in.
  *
- * This is NOT the shipping auth story. Supabase auth replaces it before any
- * real cohort exists — the rule that there are no anonymous accounts is a
- * safety requirement, not a preference, and a cookie is not an account. It
- * exists so the whole flow is drivable locally with no keys.
+ * Two paths, and which one runs depends on whether Supabase keys exist rather
+ * than on a flag that could disagree with reality:
+ *
+ *   configured   — a real Google account. The Supabase user id IS the profile
+ *                  id, which is what the schema assumes (profiles references
+ *                  auth.users(id)), so there is no email join to get wrong.
+ *   unconfigured — the demo cookie below, holding a locally-created profile.
+ *
+ * The demo path is not the shipping auth story and never was: "no anonymous
+ * accounts" is a safety requirement and an unsigned cookie is not an account.
+ * It survives because the product's promise is that the whole flow is drivable
+ * with no keys, and losing that costs more than keeping two paths.
+ *
+ * Either way the return type is the same, so every page gate above this is
+ * untouched by which one ran.
  */
 export async function getCurrentProfile(): Promise<Profile | null> {
+  if (IS_SUPABASE_CONFIGURED) {
+    const user = await getSupabaseUser();
+    if (!user) return null;
+    // Null here is a signed-in user who has not finished /join yet — the
+    // onboarding gate below turns that into a redirect rather than an error.
+    return getProfile(user.id);
+  }
+
   const store = await cookies();
   const id = store.get(SESSION_COOKIE)?.value;
   if (!id) return null;
   return getProfile(id);
+}
+
+/**
+ * The signed-in identity that has no profile yet.
+ *
+ * Returned separately from getCurrentProfile because "signed in with Google
+ * but has not answered the three questions" is a real state that the join form
+ * needs to distinguish from "not signed in at all".
+ */
+export async function getPendingAuthUserId(): Promise<string | null> {
+  if (!IS_SUPABASE_CONFIGURED) return null;
+  const user = await getSupabaseUser();
+  return user?.id ?? null;
 }
 
 export async function setSession(profileId: string): Promise<void> {
@@ -32,6 +66,10 @@ export async function setSession(profileId: string): Promise<void> {
 }
 
 export async function clearSession(): Promise<void> {
+  const supabase = await getSupabaseServerClient();
+  if (supabase) await supabase.auth.signOut();
+
+  // Cleared unconditionally: a session may predate Supabase being configured.
   const store = await cookies();
   store.delete(SESSION_COOKIE);
 }

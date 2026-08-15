@@ -1,7 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { clearSession, getCurrentProfile, setSession } from "@/lib/auth";
+import {
+  clearSession,
+  getCurrentProfile,
+  getPendingAuthUserId,
+  setSession,
+} from "@/lib/auth";
 import {
   COMMON_FIRST_LANGUAGES,
   isAgeBandId,
@@ -65,7 +70,16 @@ export async function createAccount(
     ? targetLanguageRaw
     : TARGET_LANGUAGES[0].code;
 
+  /*
+   * When Google sign-in is configured, the profile adopts the Supabase user id
+   * rather than minting its own — the schema keys profiles to auth.users(id),
+   * so these have to be the same value. The session cookie is then redundant,
+   * because the Supabase cookies already carry the identity.
+   */
+  const authUserId = await getPendingAuthUserId();
+
   const profile = await createProfile({
+    id: authUserId ?? undefined,
     displayName: name,
     targetLanguage,
     levelBand,
@@ -73,7 +87,7 @@ export async function createAccount(
     ageBand,
   });
 
-  await setSession(profile.id);
+  if (!authUserId) await setSession(profile.id);
   redirect("/rules");
 }
 
@@ -116,6 +130,11 @@ export async function createGuest(
     rulesAcceptedAt: new Date().toISOString(),
   });
 
+  /*
+   * Always the demo cookie, even with Supabase configured. A guest has no
+   * account by definition, and quietly binding one to a Google identity would
+   * make "practise without an account" untrue.
+   */
   await setSession(profile.id);
   redirect("/cohort");
 }

@@ -111,9 +111,15 @@ export async function createProfile(input: {
   firstLanguage: string;
   ageBand: AgeBandId;
   tier?: "member" | "guest";
+  /*
+   * Supplied when the identity is owned elsewhere — a Supabase user id. The
+   * profile row is keyed to auth.users(id) in the schema, so the two must be
+   * the same value rather than joined on an email.
+   */
+  id?: string;
 }): Promise<Profile> {
   const profile: Profile = {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     displayName: input.displayName,
     targetLanguage: input.targetLanguage,
     levelBand: input.levelBand,

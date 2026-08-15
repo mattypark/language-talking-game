@@ -244,6 +244,14 @@ So, from v1:
 - **Audio only.** No video.
 - **Closed cohort rings** — invite-code or campus-scoped pools, not the open
   internet. Open random matching is a separate, later, deliberate decision.
+- **Google sign-in via Supabase**, with the demo cookie as the no-keys
+  fallback. The Supabase user id *is* the profile id — the schema keys
+  `profiles` to `auth.users(id)`, so there is no email join to get wrong.
+  Signing in does not create a profile: a Google account tells us a name and
+  nothing about the language or the age band, and the second of those is a
+  safety constraint. Session reads use `getUser()`, never `getSession()`, so
+  the token is revalidated rather than read out of a cookie the client
+  controls. `/auth/callback` only ever redirects to a path on its own origin.
 - **No anonymous accounts.** A guest tier exists and is not an exception to
   this: a guest still declares an age band, is still matched under the same
   separation, and still accepts the rules. What a guest gives up is the report,
