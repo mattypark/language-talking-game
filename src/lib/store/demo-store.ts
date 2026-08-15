@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   EMPTY_DATABASE,
@@ -58,13 +58,30 @@ async function load(): Promise<Database> {
   }
 }
 
+let writeCounter = 0;
+
 /** Serialised so two overlapping requests cannot interleave a read-modify-write. */
 async function mutate<T>(change: (db: Database) => T): Promise<T> {
   const run = writeQueue.then(async () => {
     const db = await load();
     const result = change(db);
     await mkdir(dirname(DATA_FILE), { recursive: true });
-    await writeFile(DATA_FILE, JSON.stringify(db, null, 2), "utf8");
+
+    /*
+     * Written to a temporary file and renamed, because writeFile truncates
+     * first and every read goes straight to disk. A reader landing in that
+     * window gets a partial file and "Unexpected end of JSON input" — which
+     * surfaced as intermittent 500s from POST /api/sessions during a real two
+     * person call, i.e. as a lost report. rename(2) is atomic within a
+     * filesystem, so a reader sees either the old file or the new one.
+     *
+     * The suffix is per-write: two mutations are serialised by the queue, but
+     * a crashed run must not leave a temp file that the next one appends to.
+     */
+    const temporary = `${DATA_FILE}.${process.pid}.${writeCounter++}.tmp`;
+    await writeFile(temporary, JSON.stringify(db, null, 2), "utf8");
+    await rename(temporary, DATA_FILE);
+
     return result;
   });
 

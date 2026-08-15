@@ -26,7 +26,18 @@ const DEMO_POSTER = "/demo-poster.jpg";
  */
 export function DemoFilm() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMissing, setIsMissing] = useState(false);
+
+  /*
+   * Three states, not two. Rendering the <video> optimistically and swapping to
+   * the fallback on 404 fires a real request for a file that is usually not
+   * there — two console errors on every visit, plus a poster request for the
+   * same nonexistent recording. Waiting for the answer costs one round trip
+   * against a HEAD request and keeps the console honest, which matters because
+   * e2e/onboarding.mjs fails the run on console errors.
+   */
+  const [state, setState] = useState<"checking" | "present" | "missing">(
+    "checking",
+  );
 
   useEffect(() => {
     // A HEAD request answers the question without downloading the file.
@@ -34,9 +45,9 @@ export function DemoFilm() {
     void (async () => {
       try {
         const response = await fetch(DEMO_SRC, { method: "HEAD" });
-        if (!cancelled && !response.ok) setIsMissing(true);
+        if (!cancelled) setState(response.ok ? "present" : "missing");
       } catch {
-        if (!cancelled) setIsMissing(true);
+        if (!cancelled) setState("missing");
       }
     })();
     return () => {
@@ -44,7 +55,12 @@ export function DemoFilm() {
     };
   }, []);
 
-  if (isMissing) {
+  if (state === "checking") {
+    // Reserves the exact box either outcome will occupy, so nothing shifts.
+    return <div className="aspect-video w-full rounded-lg bg-sunken" />;
+  }
+
+  if (state === "missing") {
     return (
       <div className="aspect-video flex flex-col items-center justify-center rounded-lg border border-hairline bg-surface p-8 text-center">
         <Badge tone="warn" className="mb-4">
@@ -73,7 +89,7 @@ export function DemoFilm() {
         loop
         playsInline
         preload="metadata"
-        onError={() => setIsMissing(true)}
+        onError={() => setState("missing")}
       />
       <figcaption className="t-caption mt-3 text-ink-muted">
         A full session, start to report.

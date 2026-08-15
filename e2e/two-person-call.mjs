@@ -41,14 +41,17 @@ async function onboard(name, band) {
 
   await page.goto(`${BASE}/join`, { waitUntil: "networkidle" });
   await page.fill("#displayName", name);
-  await page.getByText(band).click();
-  await page.getByText("18 or over").click();
+  await page.getByRole("button", { name: /^English/ }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByText(band).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByText("18 or over").click();
+  await page.getByRole("button", { name: "Start practising" }).click();
   await page.waitForURL("**/rules");
   await page.getByRole("button", { name: /read these/i }).click();
   await page.waitForURL("**/cohort");
   await page.fill("#inviteCode", "PRACTICE");
-  await page.getByRole("button", { name: "Join" }).click();
+  await page.getByRole("button", { name: "Join", exact: true }).click();
   await page.waitForURL("**/practice");
 
   console.log(`ok   ${name} onboarded`);
@@ -195,14 +198,43 @@ const bandText = await alice.page.locator("p.t-title-2").allInnerTexts();
 console.log(`     report headings: ${bandText.slice(0, 3).join(" | ")}`);
 await alice.page.screenshot({ path: `${OUT}/s9-report.png`, fullPage: true });
 
-// The report must be scoped to its owner: Bob may not read Alice's.
+/*
+ * The report must be scoped to its owner.
+ *
+ * Note what this canNOT be: a check that Bob gets a non-200. Both people were
+ * in the same session and both are entitled to a report for it, so Bob asking
+ * for that session id and receiving 200 is correct — he is being handed HIS
+ * report. The old assertion treated the session id as a secret only Alice
+ * held, and passed only because it ran before Bob's report existed. It would
+ * have gone on passing while leaking, if the route had ever stopped scoping by
+ * caller.
+ *
+ * The property that actually matters is whose report comes back.
+ */
 const aliceUrl = new URL(alice.page.url());
-const stolen = await bob.page.evaluate(async (path) => {
-  const res = await fetch(path.replace("/practice/report/", "/api/sessions/") + "/score");
-  return res.status;
-}, aliceUrl.pathname);
-if (stolen === 200) throw new Error("a partner was able to read someone else's report");
-console.log(`ok   partner cannot read the other person's report (HTTP ${stolen})`);
+const apiPath = aliceUrl.pathname.replace("/practice/report/", "/api/sessions/") + "/score";
+
+const readReport = (page) =>
+  page.evaluate(async (path) => {
+    const res = await fetch(path);
+    if (!res.ok) return { status: res.status, profileId: null };
+    const body = await res.json();
+    return { status: res.status, profileId: body.report?.profileId ?? null };
+  }, apiPath);
+
+const mine = await readReport(alice.page);
+const theirs = await readReport(bob.page);
+
+if (mine.status !== 200 || !mine.profileId) {
+  throw new Error(`the owner could not read her own report (HTTP ${mine.status})`);
+}
+if (theirs.profileId === mine.profileId) {
+  throw new Error("a partner was served someone else's report");
+}
+console.log(
+  `ok   same session id, different report per caller ` +
+    `(owner ${mine.profileId.slice(0, 8)}, partner ${String(theirs.profileId).slice(0, 8)})`,
+);
 
 console.log(`\nconsole/page errors: ${errors.length}`);
 if (errors.length) console.log(errors.slice(0, 6).join("\n"));

@@ -205,7 +205,7 @@ background — two indistinguishable high-chroma accents on one screen, which
 rule 1 forbids. `--stage-accent` is now an alias of `--accent-bright`, and
 `--stage-ink` / `--stage-ink-dim` are aliases of `--ink` / `--ink-muted`.
 
-Run `node scripts/contrast-audit.mjs` against a dev server to re-check all 48
+Run `node scripts/contrast-audit.mjs` against a dev server to re-check all 49
 pairs after any palette change. It measures rendered pixels, not arithmetic —
 and it composites translucent tokens over their real backdrop rather than
 reporting them at full strength.

@@ -14,14 +14,17 @@ page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
 await page.goto(`${BASE}/join`, { waitUntil: "networkidle" });
 await page.fill("#displayName", "Solo");
-await page.getByText("Getting comfortable").click();
-await page.getByText("18 or over").click();
+await page.getByRole("button", { name: /^English/ }).click();
 await page.getByRole("button", { name: "Continue" }).click();
+await page.getByText("Getting comfortable").click();
+await page.getByRole("button", { name: "Continue" }).click();
+await page.getByText("18 or over").click();
+await page.getByRole("button", { name: "Start practising" }).click();
 await page.waitForURL("**/rules");
 await page.getByRole("button", { name: /read these/i }).click();
 await page.waitForURL("**/cohort");
 await page.fill("#inviteCode", "PRACTICE");
-await page.getByRole("button", { name: "Join" }).click();
+await page.getByRole("button", { name: "Join", exact: true }).click();
 await page.waitForURL("**/practice");
 console.log("ok   onboarded");
 

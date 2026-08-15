@@ -21,7 +21,31 @@ const ctx = await browser.newContext({ viewport: { width: 480, height: 900 }, de
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
-page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+/*
+ * Two components deliberately probe for optional files with a HEAD request and
+ * render an honest empty state when they 404 — the hero photograph and the
+ * walkthrough film. Chrome logs every 404 as a console error, so without this
+ * the run fails on the app working exactly as designed. Anything else still
+ * counts.
+ */
+const EXPECTED_404 = ["/hero.jpg", "/demo.mp4", "/demo-poster.jpg"];
+page.on("console", (m) => {
+  if (m.type() !== "error") return;
+  /*
+   * "Failed to load resource" does not name the URL, so it cannot be filtered
+   * and cannot be acted on. The response handler below reports the same
+   * failures WITH the URL, so this one is pure noise.
+   */
+  const text = m.text();
+  if (text.startsWith("Failed to load resource")) return;
+  errors.push(text);
+});
+
+page.on("response", (response) => {
+  if (response.status() < 400) return;
+  if (EXPECTED_404.some((path) => response.url().endsWith(path))) return;
+  errors.push(`HTTP ${response.status()} ${response.url()}`);
+});
 
 const step = async (label, fn) => {
   await fn();
@@ -67,7 +91,7 @@ await page.screenshot({ path: `${OUT}/s2-cohort.png`, fullPage: true });
 // under-18 group, even by typing its code directly.
 await step("SCHOOL code rejected for an adult", async () => {
   await page.fill("#inviteCode", "SCHOOL");
-  await page.getByRole("button", { name: "Join" }).click();
+  await page.getByRole("button", { name: "Join", exact: true }).click();
   await page.waitForSelector('.form-error');
   const message = await page.locator('.form-error').textContent();
   if (!/different age range/i.test(message ?? "")) {
@@ -78,7 +102,7 @@ await step("SCHOOL code rejected for an adult", async () => {
 
 await step("lowercase code accepted", async () => {
   await page.fill("#inviteCode", "practice");
-  await page.getByRole("button", { name: "Join" }).click();
+  await page.getByRole("button", { name: "Join", exact: true }).click();
   await page.waitForURL("**/practice");
 });
 await page.screenshot({ path: `${OUT}/s2-practice.png`, fullPage: true });
