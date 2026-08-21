@@ -11,17 +11,22 @@ import { matchmakerHttpUrl } from "@/lib/matchmaker-url";
  *
  * So the entry screens call this the moment they render — long before anyone
  * presses anything — and the wait happens during the part of the flow where
- * there was already reading to do. Two minutes of timeout because a cold start
- * is genuinely slow, and it costs nothing: nobody is waiting on this response
- * to be able to act.
+ * there was already reading to do.
+ *
+ * Each attempt is short and the CLIENT keeps polling, rather than one request
+ * holding a serverless function open for a minute: a hanging invocation would
+ * hit the platform's own duration cap anyway, and every retry is another
+ * knock on the sleeping service's door. The answer only has to be true by the
+ * time someone presses the button.
  */
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 export async function GET() {
   try {
     const response = await fetch(`${matchmakerHttpUrl()}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(9_000),
     });
     if (!response.ok) throw new Error(`matchmaker said ${response.status}`);
 

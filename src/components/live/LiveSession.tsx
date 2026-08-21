@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CallView } from "./CallView";
 import { CountdownView } from "./CountdownView";
 import { GuestEndView } from "./GuestEndView";
+import { Console } from "@/components/console/Console";
 import { ProposalView } from "./ProposalView";
 import { QueueView } from "./QueueView";
 import { Button } from "@/components/ui/Button";
@@ -68,7 +69,10 @@ export function LiveSession({
    * auto-joins the moment the socket goes idle, and without this the call
    * would dissolve straight back into a search with nothing said about it.
    */
-  const [hasEndedAsGuest, setHasEndedAsGuest] = useState(false);
+  const [guestEnd, setGuestEnd] = useState<{
+    partnerName: string | null;
+    secondsSpoken: number;
+  } | null>(null);
   const [videoState, setVideoState] = useState<VideoState>("off");
   const [secondsRemaining, setSecondsRemaining] = useState(SESSION_SECONDS);
 
@@ -86,6 +90,18 @@ export function LiveSession({
    * go after the partner has already gone.
    */
   const lastSessionIdRef = useRef<string | null>(null);
+  const lastPartnerNameRef = useRef<string | null>(null);
+  /*
+   * When this call opened, kept past the state being cleared.
+   *
+   * The off-air screen reports how long the line was open, and both endings
+   * clear callStartedAt before anyone can read it — a hang-up in the same
+   * batch, a partner leaving one tick earlier. Deriving the number from the
+   * ticking countdown instead would put a value that changes twice a second
+   * into an effect's dependencies, which is an update loop rather than a
+   * measurement.
+   */
+  const callStartedAtRef = useRef<number | null>(null);
 
   /**
    * Camera controls ride the same relay as the WebRTC signals, so they are
@@ -136,25 +152,31 @@ export function LiveSession({
     if (matchmaker.state.sessionId) {
       lastSessionIdRef.current = matchmaker.state.sessionId;
     }
-  }, [matchmaker.state.sessionId]);
-
-  /** Survives the partner leaving, which is exactly when it is needed. */
-  const lastPartnerNameRef = useRef<string | null>(null);
-  useEffect(() => {
+    /*
+     * The partner's name outlives the state that held it: "peer-left" clears
+     * the partner, and the off-air screen still has to name whoever that was.
+     * Read only from a callback, never during render.
+     */
     if (matchmaker.state.partner) {
       lastPartnerNameRef.current = matchmaker.state.partner.displayName;
     }
-  }, [matchmaker.state.partner]);
+  }, [matchmaker.state.sessionId, matchmaker.state.partner]);
+
+  useEffect(() => {
+    if (callStartedAt !== null) callStartedAtRef.current = callStartedAt;
+  }, [callStartedAt]);
+
+
 
   const { phase } = matchmaker.state;
   const { enqueue } = matchmaker;
 
   /** Join the queue as soon as the socket is up, in the room they chose. */
   useEffect(() => {
-    if (phase === "idle" && !isCallOpen && !hasEndedAsGuest) {
+    if (phase === "idle" && !isCallOpen && guestEnd === null) {
       enqueue({ language, topicId });
     }
-  }, [phase, isCallOpen, hasEndedAsGuest, enqueue, language, topicId]);
+  }, [phase, isCallOpen, guestEnd, enqueue, language, topicId]);
 
   /** Countdown for the call itself. */
   useEffect(() => {
@@ -197,7 +219,10 @@ export function LiveSession({
      * tier is written to avoid.
      */
     if (isGuest) {
-      setHasEndedAsGuest(true);
+      setGuestEnd({
+        partnerName: lastPartnerNameRef.current,
+        secondsSpoken: secondsOnAir(callStartedAtRef.current),
+      });
       return;
     }
 
@@ -210,7 +235,13 @@ export function LiveSession({
    * scored.
    */
   useEffect(() => {
-    if (!didPartnerLeave) return;
+    /*
+     * Once, not once per render. A guest is not navigated away afterwards, so
+     * this effect stays mounted with `didPartnerLeave` still true — and its
+     * dependencies include objects that are rebuilt each render, which without
+     * this guard is an upload and a setState on a loop.
+     */
+    if (!didPartnerLeave || guestEnd !== null) return;
 
     const sessionId = matchmaker.state.sessionId ?? lastSessionIdRef.current;
     void (async () => {
@@ -218,13 +249,17 @@ export function LiveSession({
         await recorder.stopAndUpload(sessionId, profile.id);
       }
       if (isGuest) {
-        setHasEndedAsGuest(true);
+        setGuestEnd({
+          partnerName: lastPartnerNameRef.current,
+          secondsSpoken: secondsOnAir(callStartedAtRef.current),
+        });
         return;
       }
       router.push(sessionId ? `/practice/report/${sessionId}` : "/practice");
     })();
   }, [
     didPartnerLeave,
+    guestEnd,
     matchmaker.state.sessionId,
     recorder,
     profile.id,
@@ -402,17 +437,28 @@ export function LiveSession({
   }
 
   if (phase === "connecting" || phase === "offline") {
+    /*
+     * A hosted matchmaker on a free plan is stopped while nobody is using it,
+     * and starting it again takes tens of seconds. That is not the same event
+     * as a dropped connection, and saying "lost the connection" during a cold
+     * start is how a working product gets read as a broken one. The socket
+     * retries either way; only the sentence changes.
+     */
+    const isRemote = /^wss:/.test(matchmakerUrl);
+
     return (
-      <Card className="p-6">
+      <Console label={phase === "offline" ? "Line dropped" : "Opening the line"}>
         <p className="t-title-3 mb-2">
           {phase === "offline" ? "Reconnecting…" : "Connecting…"}
         </p>
         <p className="t-body text-ink-muted">
           {phase === "offline"
-            ? "Lost the connection to the matchmaker. Trying again."
-            : "Opening a line to the matchmaker."}
+            ? "Lost the connection to the matchmaker. Trying again, and a call in progress survives a short drop."
+            : isRemote
+              ? "Waking the room. If nobody has been on for a while this takes half a minute — it keeps retrying on its own."
+              : "Opening a line to the matchmaker."}
         </p>
-      </Card>
+      </Console>
     );
   }
 
@@ -421,15 +467,15 @@ export function LiveSession({
    * redirect to, and the queue would otherwise re-open a search underneath
    * them the instant the socket went idle.
    */
-  if (hasEndedAsGuest) {
+  if (guestEnd) {
     return (
       <GuestEndView
-        partnerName={lastPartnerNameRef.current}
-        secondsSpoken={SESSION_SECONDS - secondsRemaining}
+        partnerName={guestEnd.partnerName}
+        secondsSpoken={guestEnd.secondsSpoken}
         onGoAgain={() => {
           setDidPartnerLeave(false);
           setSecondsRemaining(SESSION_SECONDS);
-          setHasEndedAsGuest(false);
+          setGuestEnd(null);
         }}
       />
     );
@@ -511,4 +557,11 @@ export function LiveSession({
       }}
     />
   );
+}
+
+/** How long the line was actually open, clamped to the session length. */
+function secondsOnAir(startedAt: number | null): number {
+  if (startedAt === null) return 0;
+  const elapsed = Math.round((Date.now() - startedAt) / 1000);
+  return Math.max(0, Math.min(SESSION_SECONDS, elapsed));
 }

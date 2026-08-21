@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Console } from "@/components/console/Console";
 import { Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Button } from "@/components/ui/Button";
@@ -89,7 +89,9 @@ export function ProposalView({
  * supposed to describe; otherwise this counts down from arrival.
  */
 function useProposalCountdown(expiresAt: number | null): number {
-  const arrivedAt = useRef(Date.now());
+  // State, not a ref: this is read while rendering, and a lazy initializer is
+  // the one place a clock read belongs.
+  const [arrivedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -103,7 +105,7 @@ function useProposalCountdown(expiresAt: number | null): number {
 
   const seconds = isPlausible
     ? fromServer
-    : PROPOSAL_SECONDS - (now - arrivedAt.current) / 1000;
+    : PROPOSAL_SECONDS - (now - arrivedAt) / 1000;
 
   return Math.max(0, Math.round(seconds));
 }

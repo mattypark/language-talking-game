@@ -10,6 +10,11 @@ export type RoomStatus = {
   liveSessions: number;
 };
 
+/*
+ * Fast enough that a cold start resolves visibly, slow enough that a sleeping
+ * service is knocked on rather than hammered. Each poll is its own short
+ * request — see /api/matchmaker/wake for why the waiting is not done there.
+ */
 const POLL_MS = 5000;
 
 /**

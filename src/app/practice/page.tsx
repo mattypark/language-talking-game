@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { RoomChooser } from "./RoomChooser";
 import { signOut } from "@/app/actions/account";
+import { Console } from "@/components/console/Console";
+import { Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -43,18 +45,31 @@ export default async function PracticePage() {
         </p>
       </header>
 
-      <Card className="mb-6 p-5">
-        <p className="t-label mb-3">You&rsquo;ll be matched as</p>
-        <dl className="space-y-2">
-          <Row label="Speaking level" value={`${band?.label} · ${band?.cefr}`} />
-          <Row label="Age pool" value={profile.ageBand === "adult" ? "18+" : "Under 18"} />
-          <Row
-            label="Groups"
-            value={cohortNames.filter((name) => name !== null).join(", ") || "None yet"}
+      <Console label="You'll be matched as" isQuiet className="mb-6">
+        <Telemetry>
+          <TelemetryRow
+            label="Speaking level"
+            value={`${band?.label} · ${band?.cefr}`}
           />
-          <Row label="First language" value={profile.firstLanguage} />
-        </dl>
-      </Card>
+          <TelemetryRow
+            label="Age pool"
+            value={profile.ageBand === "adult" ? "18+" : "under 18"}
+          />
+          <TelemetryRow
+            label="Rings"
+            value={
+              cohortNames.filter((name) => name !== null).join(", ") || "none yet"
+            }
+            tone={cohortNames.length > 0 ? "default" : "warn"}
+          />
+          <TelemetryRow label="First language" value={profile.firstLanguage} tone="dim" />
+          <TelemetryRow
+            label="Recording"
+            value={profile.tier === "guest" ? "off · no report" : "your own mic only"}
+            tone="dim"
+          />
+        </Telemetry>
+      </Console>
 
       <div className="mb-10">
         <RoomChooser
@@ -80,14 +95,5 @@ export default async function PracticePage() {
         </Button>
       </form>
     </main>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="t-caption text-ink-muted">{label}</dt>
-      <dd className="t-body text-right">{value}</dd>
-    </div>
   );
 }
