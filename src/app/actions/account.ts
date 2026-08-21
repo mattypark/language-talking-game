@@ -14,6 +14,8 @@ import {
   isTargetLanguage,
   TARGET_LANGUAGES,
 } from "@/lib/domain";
+import { startGuest } from "@/lib/guest";
+import { publicCohortFor } from "@/lib/public-room";
 import {
   createProfile,
   findCohortByInviteCode,
@@ -117,26 +119,49 @@ export async function createGuest(
     ? targetLanguageRaw
     : TARGET_LANGUAGES[0].code;
 
-  const profile = await createProfile({
-    displayName: "Guest",
-    targetLanguage,
-    levelBand: "intermediate",
-    firstLanguage: "Other",
-    ageBand,
-    tier: "guest",
-  });
-
-  await updateProfile(profile.id, {
-    rulesAcceptedAt: new Date().toISOString(),
-  });
+  const levelBandRaw = formData.get("levelBand");
+  const levelBand = isLevelBandId(levelBandRaw) ? levelBandRaw : "intermediate";
 
   /*
-   * Always the demo cookie, even with Supabase configured. A guest has no
-   * account by definition, and quietly binding one to a Google identity would
-   * make "practise without an account" untrue.
+   * A name is optional here and required of a member, which is the difference
+   * between the two paths stated in one field: a member is someone who comes
+   * back, a guest is someone finding out whether this is bearable at all.
    */
-  await setSession(profile.id);
-  redirect("/cohort");
+  const nameRaw = formData.get("displayName");
+  const typed = typeof nameRaw === "string" ? nameRaw.trim() : "";
+  const displayName = typed.length >= 2 ? typed.slice(0, MAX_NAME_LENGTH) : "Guest";
+
+  /*
+   * No row, anywhere. A guest keeps nothing by design, so everything they are
+   * fits in a signed cookie — which is also the only identity that works on a
+   * deployment with no writable disk. See lib/guest.ts.
+   */
+  await startGuest({ displayName, targetLanguage, levelBand, ageBand });
+
+  redirect("/practice/live");
+}
+
+/**
+ * A member joins the open room.
+ *
+ * The invite-code ring is still the better shape and still the default for
+ * anyone who has a code. This is for the person who has none: one open ring
+ * per age band, joined in one click, matched under exactly the same
+ * separation. See lib/public-room.ts for why that ring is a constant and not
+ * a row.
+ */
+export async function joinPublicRoom(): Promise<void> {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/join");
+
+  const cohortId = publicCohortFor(profile.ageBand);
+  if (!profile.cohortIds.includes(cohortId)) {
+    await updateProfile(profile.id, {
+      cohortIds: [...profile.cohortIds, cohortId],
+    });
+  }
+
+  redirect("/practice");
 }
 
 export async function acceptRules(): Promise<void> {

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-
-const DEFAULT_MATCHMAKER_HTTP = "http://localhost:4100";
+import { matchmakerHttpUrl } from "@/lib/matchmaker-url";
 
 /**
  * The topic bank, proxied from the matchmaker.
@@ -10,16 +9,12 @@ const DEFAULT_MATCHMAKER_HTTP = "http://localhost:4100";
  * first time either side gained a topic.
  */
 export async function GET() {
-  const base = (
-    process.env.NEXT_PUBLIC_MATCHMAKER_URL ?? DEFAULT_MATCHMAKER_HTTP
-  )
-    .replace(/^ws:/, "http:")
-    .replace(/^wss:/, "https:");
+  const base = matchmakerHttpUrl();
 
   try {
     const response = await fetch(`${base}/topics`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`matchmaker said ${response.status}`);
     return NextResponse.json(await response.json());

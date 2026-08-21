@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { getCurrentProfile, nextOnboardingStep } from "@/lib/auth";
 import { LEVEL_BANDS, SESSION_SECONDS } from "@/lib/domain";
+import { publicCohortName } from "@/lib/public-room";
 import { getCohort } from "@/lib/store/demo-store";
 
 export const metadata = { title: "Practice · On Air" };
@@ -16,7 +17,19 @@ export default async function PracticePage() {
   if (step) redirect(step);
   if (!profile) redirect("/join");
 
-  const cohorts = await Promise.all(profile.cohortIds.map(getCohort));
+  /*
+   * The open rooms are constants rather than rows (see lib/public-room.ts), so
+   * they are resolved by name before the store is asked — a lookup that would
+   * return null and read as "None yet" on the one screen that has to tell
+   * someone who they will be matched with.
+   */
+  const cohortNames = await Promise.all(
+    profile.cohortIds.map(async (id) => {
+      const open = publicCohortName(id);
+      if (open) return open;
+      return (await getCohort(id))?.name ?? null;
+    }),
+  );
   const band = LEVEL_BANDS.find((b) => b.id === profile.levelBand);
   const minutes = Math.round(SESSION_SECONDS / 60);
 
@@ -37,12 +50,7 @@ export default async function PracticePage() {
           <Row label="Age pool" value={profile.ageBand === "adult" ? "18+" : "Under 18"} />
           <Row
             label="Groups"
-            value={
-              cohorts
-                .filter((cohort) => cohort !== null)
-                .map((cohort) => cohort.name)
-                .join(", ") || "None yet"
-            }
+            value={cohortNames.filter((name) => name !== null).join(", ") || "None yet"}
           />
           <Row label="First language" value={profile.firstLanguage} />
         </dl>

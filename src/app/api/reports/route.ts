@@ -58,8 +58,32 @@ export async function POST(request: Request) {
   }
 
   const session = await getSession(body.sessionId);
+
+  /*
+   * No row for this conversation.
+   *
+   * That is the normal case for a guest call: a guest records nothing, so
+   * nothing registers the session, so there is no participant list to check
+   * against and no audio to retain. Refusing here would mean the one path
+   * with the least accountability is also the one where reporting quietly
+   * does nothing.
+   *
+   * So the report is written to the server log instead, with the ids needed to
+   * find both sides in the matchmaker's trace. It is a weaker record than a
+   * row and it is the honest maximum for a call that was never stored.
+   */
   if (!session) {
-    return NextResponse.json({ error: "no-such-session" }, { status: 404 });
+    console.warn(
+      `[abuse-report] ${JSON.stringify({
+        sessionId: body.sessionId,
+        reason: body.reason,
+        note: typeof body.note === "string" ? body.note.slice(0, 500) : null,
+        reporterId: reporter.id,
+        reporterTier: reporter.tier ?? "member",
+        at: new Date().toISOString(),
+      })}`,
+    );
+    return NextResponse.json({ ok: true, storedAs: "log" });
   }
 
   // You can only report a conversation you were actually in.

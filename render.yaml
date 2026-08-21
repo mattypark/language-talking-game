@@ -1,0 +1,40 @@
+# The matchmaker, deployed.
+#
+# Vercel runs the app; this one process cannot live there, because a serverless
+# function terminates with its response and a WebSocket has to outlive one.
+# Render is the smallest thing that will hold a socket open.
+#
+# Deliberately ONE instance. The queue is in memory and that is the reason the
+# matching is correct — two copies would each match from their own half of the
+# pool and the second one would look, from the outside, exactly like a product
+# that cannot find you a partner. Scaling past this means Durable Objects or
+# Redis, never a second replica.
+#
+#   1. Render dashboard > New > Blueprint, point it at this repo.
+#   2. Set MATCHMAKER_JWT_SECRET to the SAME value as the Vercel project.
+#      `openssl rand -base64 48`. Without it the age-band separation is not
+#      enforced, and the service says so loudly on every boot.
+#   3. Set ALLOWED_ORIGINS to the deployed app origin.
+#   4. Copy the service URL into Vercel as NEXT_PUBLIC_MATCHMAKER_URL, with
+#      wss:// rather than https://.
+services:
+  - type: web
+    name: onair-matchmaker
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: services/matchmaker
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    # The free plan stops an idle service and cold-starts the next request,
+    # which the app covers with /api/matchmaker/wake. On a paid plan the
+    # service simply stays up and that wake call returns instantly.
+    numInstances: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: MATCHMAKER_JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

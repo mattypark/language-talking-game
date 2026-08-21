@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-
-const DEFAULT_MATCHMAKER_HTTP = "http://localhost:4100";
+import { matchmakerHttpUrl } from "@/lib/matchmaker-url";
 
 /** Live per-room waiting counts, proxied from the matchmaker. */
 export async function GET(request: Request) {
   const incoming = new URL(request.url);
-  const base = (
-    process.env.NEXT_PUBLIC_MATCHMAKER_URL ?? DEFAULT_MATCHMAKER_HTTP
-  )
-    .replace(/^ws:/, "http:")
-    .replace(/^wss:/, "https:");
+  const base = matchmakerHttpUrl();
 
   try {
     const response = await fetch(`${base}/rooms?${incoming.searchParams}`, {

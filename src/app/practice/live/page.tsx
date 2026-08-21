@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 import { LiveSession } from "@/components/live/LiveSession";
 import { getCurrentProfile, nextOnboardingStep } from "@/lib/auth";
 import { ANY_TOPIC, isTargetLanguage } from "@/lib/domain";
+import { matchmakerWsUrl } from "@/lib/matchmaker-url";
 import { mintQueueToken } from "@/lib/queue-token";
 import { isGuest } from "@/lib/tiers";
 
 export const metadata = { title: "Practising · On Air" };
 
-const DEFAULT_MATCHMAKER_URL = "ws://localhost:4100";
 const DEFAULT_STUN = "stun:stun.cloudflare.com:3478";
 
 export default async function LivePage({
@@ -21,8 +21,7 @@ export default async function LivePage({
   if (step) redirect(step);
   if (!profile) redirect("/join");
 
-  const matchmakerUrl =
-    process.env.NEXT_PUBLIC_MATCHMAKER_URL ?? DEFAULT_MATCHMAKER_URL;
+  const matchmakerUrl = matchmakerWsUrl();
 
   /*
    * STUN only by default. TURN is added once credentials exist — it is needed

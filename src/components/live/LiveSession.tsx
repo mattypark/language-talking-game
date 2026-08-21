@@ -322,8 +322,13 @@ export function LiveSession({
 
     const { sessionId, topic } = matchmaker.state;
 
-    // Register the session before recording, so the upload has somewhere to go.
-    if (sessionId && topic) {
+    /*
+     * Register the session before recording, so the upload has somewhere to
+     * go. A guest never records, so there is nothing to register and nothing
+     * to write — which is also what lets a guest call work on a deployment
+     * with no store behind it at all.
+     */
+    if (sessionId && topic && !isGuest) {
       try {
         await fetch("/api/sessions", {
           method: "POST",

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { clearGuest, getGuestProfile } from "@/lib/guest";
 import { getProfile } from "@/lib/store/demo-store";
 import { IS_SUPABASE_CONFIGURED } from "@/lib/supabase/config";
 import { getSupabaseServerClient, getSupabaseUser } from "@/lib/supabase/server";
@@ -29,11 +30,19 @@ const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
 export async function getCurrentProfile(): Promise<Profile | null> {
   if (IS_SUPABASE_CONFIGURED) {
     const user = await getSupabaseUser();
-    if (!user) return null;
-    // Null here is a signed-in user who has not finished /join yet — the
-    // onboarding gate below turns that into a redirect rather than an error.
-    return getProfile(user.id);
+    // A signed-in account always wins over a guest cookie left over from
+    // before. Null here is a signed-in user who has not finished /join yet —
+    // the onboarding gate below turns that into a redirect, not an error.
+    if (user) return getProfile(user.id);
   }
+
+  /*
+   * The guest, who has no row anywhere. Checked before the demo cookie
+   * because it is the only identity that survives a deployment with no
+   * store behind it — see the note in lib/guest.ts.
+   */
+  const guest = await getGuestProfile();
+  if (guest) return guest;
 
   const store = await cookies();
   const id = store.get(SESSION_COOKIE)?.value;
@@ -68,6 +77,8 @@ export async function setSession(profileId: string): Promise<void> {
 export async function clearSession(): Promise<void> {
   const supabase = await getSupabaseServerClient();
   if (supabase) await supabase.auth.signOut();
+
+  await clearGuest();
 
   // Cleared unconditionally: a session may predate Supabase being configured.
   const store = await cookies();

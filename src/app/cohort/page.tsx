@@ -1,46 +1,53 @@
 import { redirect } from "next/navigation";
 import { CohortForm } from "./CohortForm";
+import { joinPublicRoom } from "@/app/actions/account";
 import { FlowSpine } from "@/components/onboarding/FlowSpine";
+import { Button } from "@/components/ui/Button";
 import { getCurrentProfile } from "@/lib/auth";
-import { ensureSeedCohorts } from "@/lib/store/seed";
+import { PUBLIC_COHORT_NAMES } from "@/lib/public-room";
 
-export const metadata = { title: "Join a group · On Air" };
+export const metadata = { title: "Where you'll be matched · On Air" };
 
 export default async function CohortPage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/join");
   if (!profile.rulesAcceptedAt) redirect("/rules");
 
-  const seeded = await ensureSeedCohorts();
-  const openToYou = seeded.filter((cohort) => cohort.ageBand === profile.ageBand);
+  const openRoomName = PUBLIC_COHORT_NAMES[profile.ageBand];
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-14">
       <FlowSpine current="group" />
 
-      <h1 className="t-title-1 mb-2">Join a group</h1>
-      <p className="t-body mb-3 text-ink-muted">
-        You get matched inside a group, not across the open internet. A group is
-        a class, a club, a server — a ring of people with something in common
-        and someone who can vouch for them.
-      </p>
+      <h1 className="t-title-1 mb-2">Where you&rsquo;ll be matched</h1>
       <p className="t-body mb-8 text-ink-muted">
-        It also makes the queue work. A hundred people who show up at the same
-        time beat a hundred thousand scattered across every timezone.
+        You get matched inside a ring, not across the open internet. The open
+        room is one ring; a class, a club or a server with an invite code is a
+        tighter one. Either way, under-18s and adults never share a pool.
       </p>
 
       {/*
-       * Only groups matching this profile's age band are ever offered. The
-       * server action refuses a mismatch anyway — this filter is so the refusal
-       * is something a user has to go looking for rather than walk into.
+       * The open room first, because it is the one thing someone arriving with
+       * no code can actually do. It is a constant rather than a row — see
+       * lib/public-room.ts — so this button needs no store behind it.
        */}
-      <CohortForm
-        openCohorts={openToYou.map((cohort) => ({
-          id: cohort.id,
-          name: cohort.name,
-          inviteCode: cohort.inviteCode,
-        }))}
-      />
+      <form action={joinPublicRoom} className="mb-8">
+        <div className="mb-3 rounded-lg border border-hairline bg-surface p-5">
+          <p className="t-title-3 mb-1">{openRoomName}</p>
+          <p className="t-body text-ink-muted">
+            Anyone practising the same language, in your age band. The fastest
+            way to get on a call, and the pool everyone else widens into.
+          </p>
+        </div>
+        <Button type="submit" variant="primary" size="lg" isBlock>
+          Join the open room
+        </Button>
+      </form>
+
+      <div className="border-t border-hairline pt-8">
+        <p className="t-label mb-3">Have a code instead?</p>
+        <CohortForm openCohorts={[]} />
+      </div>
     </main>
   );
 }

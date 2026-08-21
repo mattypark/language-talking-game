@@ -26,6 +26,31 @@ import { TOPICS, getTopic, pickTopic } from "./topics.js";
  */
 
 const PORT = Number(process.env.PORT ?? 4100);
+
+/**
+ * Origins allowed to open a socket, comma separated.
+ *
+ * Empty means anything, which is what a laptop and the end-to-end scripts
+ * need. On a deployment it is set to the app's origin — not as a security
+ * boundary (a browser sends Origin, a script sends whatever it likes; the
+ * signed token is the real gate) but so that someone else's page cannot quietly
+ * embed this queue and spend the pool.
+ */
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (ALLOWED_ORIGINS.length === 0) return true;
+  if (!origin) return true; // Not a browser. The token still has to verify.
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.length === 0) return "*";
+  return isOriginAllowed(origin) ? (origin ?? ALLOWED_ORIGINS[0]) : ALLOWED_ORIGINS[0];
+}
 const SWEEP_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 
@@ -423,12 +448,14 @@ function sweep() {
 }
 
 const httpServer = createServer((req, res) => {
+  const allowOrigin = corsOrigin(req.headers.origin);
+
   if (req.url === "/topics") {
     // One source of truth for the topic bank. The app fetches it rather than
     // keeping a second copy that drifts.
     res.writeHead(200, {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
+      "access-control-allow-origin": allowOrigin,
     });
     res.end(JSON.stringify({ topics: TOPICS }));
     return;
@@ -444,7 +471,7 @@ const httpServer = createServer((req, res) => {
 
     res.writeHead(200, {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
+      "access-control-allow-origin": allowOrigin,
     });
     res.end(
       JSON.stringify({
@@ -471,7 +498,10 @@ const httpServer = createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server: httpServer });
+const wss = new WebSocketServer({
+  server: httpServer,
+  verifyClient: ({ origin }) => isOriginAllowed(origin),
+});
 
 wss.on("connection", (socket) => {
   connectionSequence += 1;
