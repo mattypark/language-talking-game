@@ -234,9 +234,14 @@ export function LaunchConsole({
           {isPending ? "Opening the line…" : "Go on air"}
         </Button>
 
+        {/*
+         * A disabled primary reads as a broken one unless it says what would
+         * un-disable it, and the answer here is a single tap away.
+         */}
         <p className="t-caption mt-3 text-ink-muted">
-          A guest&rsquo;s microphone never leaves their machine, so there is no
-          report at the end — that is one decision, not a paywall.
+          {ageBand === ""
+            ? "Pick your age group above — it is the one answer that decides who you can be matched with."
+            : "A guest's microphone never leaves their machine, so there is no report at the end — that is one decision, not a paywall."}
         </p>
         </div>
         </div>
