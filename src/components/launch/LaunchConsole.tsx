@@ -32,7 +32,14 @@ const MINUTES = Math.round(SESSION_SECONDS / 60);
  * The panel reads as equipment because it IS one: the mic meter is live before
  * anything is submitted, and the numbers next to it are the real queue.
  */
-export function LaunchConsole({ hasAccount }: { hasAccount: boolean }) {
+export function LaunchConsole({
+  hasAccount,
+  canMakeAccount,
+}: {
+  hasAccount: boolean;
+  /** False on a deployment with no store — see lib/deployment.ts. */
+  canMakeAccount: boolean;
+}) {
   const [result, formAction, isPending] = useActionState<FormResult, FormData>(
     createGuest,
     null,
@@ -245,7 +252,7 @@ export function LaunchConsole({ hasAccount }: { hasAccount: boolean }) {
             </Link>{" "}
             to be scored instead.
           </>
-        ) : (
+        ) : canMakeAccount ? (
           <>
             Want the report afterwards — pace, hesitations, and the one thing to
             fix?{" "}
@@ -253,6 +260,12 @@ export function LaunchConsole({ hasAccount }: { hasAccount: boolean }) {
               Make an account
             </Link>
             . Scoring means keeping a recording, which is why it needs one.
+          </>
+        ) : (
+          <>
+            The report — pace, hesitations, and the one thing to fix — needs an
+            account, and accounts are not wired up on this deployment yet.
+            Conversations are.
           </>
         )}
       </p>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CallView } from "./CallView";
 import { CountdownView } from "./CountdownView";
+import { GuestEndView } from "./GuestEndView";
 import { ProposalView } from "./ProposalView";
 import { QueueView } from "./QueueView";
 import { Button } from "@/components/ui/Button";
@@ -61,6 +62,13 @@ export function LiveSession({
   const [isMuted, setIsMuted] = useState(false);
   const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
   const [didPartnerLeave, setDidPartnerLeave] = useState(false);
+  /*
+   * A guest has no report to be sent to, so the end of a call is a screen
+   * rather than a redirect — see GuestEndView. Held here because the queue
+   * auto-joins the moment the socket goes idle, and without this the call
+   * would dissolve straight back into a search with nothing said about it.
+   */
+  const [hasEndedAsGuest, setHasEndedAsGuest] = useState(false);
   const [videoState, setVideoState] = useState<VideoState>("off");
   const [secondsRemaining, setSecondsRemaining] = useState(SESSION_SECONDS);
 
@@ -130,13 +138,23 @@ export function LiveSession({
     }
   }, [matchmaker.state.sessionId]);
 
+  /** Survives the partner leaving, which is exactly when it is needed. */
+  const lastPartnerNameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (matchmaker.state.partner) {
+      lastPartnerNameRef.current = matchmaker.state.partner.displayName;
+    }
+  }, [matchmaker.state.partner]);
+
   const { phase } = matchmaker.state;
   const { enqueue } = matchmaker;
 
   /** Join the queue as soon as the socket is up, in the room they chose. */
   useEffect(() => {
-    if (phase === "idle" && !isCallOpen) enqueue({ language, topicId });
-  }, [phase, isCallOpen, enqueue, language, topicId]);
+    if (phase === "idle" && !isCallOpen && !hasEndedAsGuest) {
+      enqueue({ language, topicId });
+    }
+  }, [phase, isCallOpen, hasEndedAsGuest, enqueue, language, topicId]);
 
   /** Countdown for the call itself. */
   useEffect(() => {
@@ -173,8 +191,18 @@ export function LiveSession({
       recorder.discard();
     }
 
+    /*
+     * A guest was never recorded, so there is no report waiting at the other
+     * end of a redirect. Sending them to one anyway would be the bait the
+     * tier is written to avoid.
+     */
+    if (isGuest) {
+      setHasEndedAsGuest(true);
+      return;
+    }
+
     router.push(sessionId ? `/practice/report/${sessionId}` : "/practice");
-  }, [matchmaker, webrtc, recorder, profile.id, router]);
+  }, [matchmaker, webrtc, recorder, profile.id, router, isGuest]);
 
   /**
    * The partner hung up. Their leaving does not delete the conversation that
@@ -189,9 +217,20 @@ export function LiveSession({
       if (sessionId && recorder.status === "recording") {
         await recorder.stopAndUpload(sessionId, profile.id);
       }
+      if (isGuest) {
+        setHasEndedAsGuest(true);
+        return;
+      }
       router.push(sessionId ? `/practice/report/${sessionId}` : "/practice");
     })();
-  }, [didPartnerLeave, matchmaker.state.sessionId, recorder, profile.id, router]);
+  }, [
+    didPartnerLeave,
+    matchmaker.state.sessionId,
+    recorder,
+    profile.id,
+    router,
+    isGuest,
+  ]);
 
   /**
    * Time is up. Ends itself rather than waiting for someone to notice.
@@ -374,6 +413,25 @@ export function LiveSession({
             : "Opening a line to the matchmaker."}
         </p>
       </Card>
+    );
+  }
+
+  /*
+   * A guest, off air. Held here rather than redirected: there is no report to
+   * redirect to, and the queue would otherwise re-open a search underneath
+   * them the instant the socket went idle.
+   */
+  if (hasEndedAsGuest) {
+    return (
+      <GuestEndView
+        partnerName={lastPartnerNameRef.current}
+        secondsSpoken={SESSION_SECONDS - secondsRemaining}
+        onGoAgain={() => {
+          setDidPartnerLeave(false);
+          setSecondsRemaining(SESSION_SECONDS);
+          setHasEndedAsGuest(false);
+        }}
+      />
     );
   }
 

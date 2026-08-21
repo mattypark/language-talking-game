@@ -57,6 +57,10 @@ cd services/matchmaker && npm install && npm start   # matchmaker, :4100
 Both are needed: the app cannot queue or place a call without the
 matchmaker, because a Vercel function cannot hold a WebSocket.
 
+`/welcome` is the whole way in — language, age band, a live mic meter, and the
+real queue readout on one screen. Two answers, because two answers are what
+actually gate a match.
+
 **If you ever see `HTTP ERROR 431` on localhost**, it is not this app. Cookies
 are scoped to the *host*, not the port, so every project you have ever run on
 `localhost` shares one cookie jar — and once it grows past Node's default 16KB
@@ -78,12 +82,68 @@ End-to-end checks drive real browsers and need `npm i -D playwright`:
 node e2e/onboarding.mjs        # profile, house rules, age-band refusal
 node e2e/two-person-call.mjs   # two browsers, a real peer connection, a report
 node e2e/ai-partner.mjs        # the empty-queue fallback
+node e2e/guest-launch.mjs      # the short way in: console -> queue, no account
 node e2e/landing.mjs           # breakpoints and the signature animation
 node scripts/contrast-audit.mjs
 ```
 
 Open `/styleguide` — that's the design system, and it's the fastest way to see
 whether a change broke something.
+
+## Deploying it
+
+Two hosts, because one process cannot be serverless.
+
+**The app → Vercel.** Import the repo, set `NEXT_PUBLIC_MATCHMAKER_URL` and
+`MATCHMAKER_JWT_SECRET`, deploy. Nothing else is required for people to talk to
+each other.
+
+**The matchmaker → Render.** `render.yaml` is a blueprint: New > Blueprint,
+point it at this repo. Set `MATCHMAKER_JWT_SECRET` to the *same* value as the
+Vercel project — the app mints queue tokens with it and the matchmaker refuses
+anything it cannot verify — and `ALLOWED_ORIGINS` to the deployed app origin.
+Then copy the service URL back into Vercel as `NEXT_PUBLIC_MATCHMAKER_URL`,
+with `wss://` rather than `https://`.
+
+One instance, deliberately. The queue lives in memory and that is *why* the
+matching is correct; a second replica would match from its own half of the pool
+and look, from outside, exactly like a product that cannot find you a partner.
+
+Render's free plan stops an idle service and cold-starts the next request,
+which takes tens of seconds. `/api/matchmaker/wake` is called the moment an
+entry screen renders, so that wait is paid while someone is still choosing a
+language rather than after they press the button. The readout says "waking the
+room" rather than pretending.
+
+### What works on a deployment with no keys at all
+
+| Works | Needs something |
+| --- | --- |
+| Open rooms, guests, queueing, live calls, video opt-in, the AI partner | Accounts, history, reports |
+
+A guest is an HMAC-signed cookie and an open room is a constant, so the whole
+conversation half of the product touches no database. Accounts do: the store in
+`src/lib/store/demo-store.ts` writes to disk, and a serverless filesystem is
+read-only, per-instance and gone between requests. So on Vercel `/join` says
+that plainly instead of taking three answers and failing on the write —
+`src/lib/deployment.ts` derives that from the environment rather than from a
+flag someone has to remember to set.
+
+Making accounts work on a deployment means implementing the Supabase-backed
+store behind the same functions. The schema is already there
+(`supabase/migrations/0001_init.sql`); what is missing is the adapter.
+
+### The open rooms
+
+There is one open ring per age band, defined in `src/lib/public-room.ts` as a
+constant rather than a row — the matchmaker holds no store and a guest has no
+row anywhere, so the two processes have to agree on the id without a database
+in between. Invite-code cohorts are unchanged and are still the tighter ring.
+
+Open matching is a real change to the safety posture, made deliberately and in
+one file. What did *not* change: age band is still carried by a signed token,
+minors and adults still never share a pool, and the matchmaker still refuses
+identity asserted by a browser.
 
 No API keys are required. `DEMO_MODE=true` in `.env.example` keeps every paid
 service stubbed. Copy it to `.env.local` when you have real keys.

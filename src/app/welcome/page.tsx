@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LaunchConsole } from "@/components/launch/LaunchConsole";
 import { DemoFilm } from "@/components/landing/DemoFilm";
 import { getCurrentProfile } from "@/lib/auth";
+import { CAN_STORE_ACCOUNTS } from "@/lib/deployment";
 import { SESSION_SECONDS } from "@/lib/domain";
 
 export const metadata = { title: "Go on air · On Air" };
@@ -38,7 +39,10 @@ export default async function WelcomePage() {
           </p>
         </header>
 
-        <LaunchConsole hasAccount={profile !== null} />
+        <LaunchConsole
+          hasAccount={profile !== null}
+          canMakeAccount={CAN_STORE_ACCOUNTS}
+        />
 
         <section className="mt-16 border-t border-hairline pt-10">
           <h2 className="t-title-2 mb-6">What happens after you press it</h2>
