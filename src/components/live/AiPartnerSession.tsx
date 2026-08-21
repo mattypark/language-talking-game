@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Console } from "@/components/console/Console";
+import { Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -181,59 +183,88 @@ export function AiPartnerSession({ profileId }: Props) {
   if (!hasStarted) {
     return (
       <div className="flex flex-1 flex-col">
-        <Badge tone="warn" className="mb-5 self-start">
-          Practising with the AI, not a person
-        </Badge>
+        {/*
+         * The label is neutral rather than a warning colour on purpose. Green
+         * means live, red means destructive, amber means something is going
+         * wrong — and an AI partner is none of those. It is a different KIND
+         * of partner, which is a fact, so it is stated in words.
+         */}
+        <Console label="Ch 02 · AI partner" className="mb-5">
+          <Telemetry className="mb-6">
+            <TelemetryRow label="Partner" value="AI · not a person" />
+            <TelemetryRow label="Voice" value="your browser" tone="dim" />
+            <TelemetryRow
+              label="Session"
+              value={formatClock(SESSION_SECONDS)}
+              tone="dim"
+            />
+            <TelemetryRow label="Report" value="same as a human call" tone="dim" />
+          </Telemetry>
 
-        <h1 className="t-title-1 mb-2">Nobody free right now</h1>
-        <p className="t-body mb-8 text-ink-muted">
-          Same topic, same timer, same report at the end. It just isn&rsquo;t a
-          person, and we&rsquo;d rather say so than pretend.
-        </p>
+          <h1 className="t-title-1 mb-2">Nobody free right now</h1>
+          <p className="t-body mb-6 text-ink-muted">
+            Same topic, same timer, same report at the end. It just isn&rsquo;t a
+            person, and we&rsquo;d rather say so than pretend.
+          </p>
 
-        <Card tone="topic" className="mb-8 p-6 pl-7">
-          <p className="t-micro mb-3 text-ink-muted">Your topic</p>
-          <p className="t-title-2">{topic.prompt}</p>
-        </Card>
+          <Card tone="topic" className="mb-6 p-6 pl-7">
+            <p className="t-micro mb-3 text-ink-muted">Your topic</p>
+            <p className="t-title-2">{topic.prompt}</p>
+          </Card>
 
-        <Button variant="primary" size="lg" isBlock onClick={() => void start()}>
-          Start talking
-        </Button>
-        {mic.errorMessage ? (
-          <p className="t-caption mt-3 text-danger">{mic.errorMessage}</p>
-        ) : null}
+          <Button variant="primary" size="lg" isBlock onClick={() => void start()}>
+            Start talking
+          </Button>
+          {mic.errorMessage ? (
+            <p className="t-caption mt-3 text-danger-ink">{mic.errorMessage}</p>
+          ) : null}
+        </Console>
       </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <header className="mb-5 flex items-center justify-between gap-4 border-b border-hairline pb-4">
+        <div className="flex items-center gap-3">
           <LiveDot />
-          <Badge tone="warn">AI partner</Badge>
+          <Badge>AI partner · not a person</Badge>
         </div>
         <span className="t-timer">{formatClock(secondsRemaining)}</span>
       </header>
 
-      <Card tone="topic" className="mb-6 p-6 pl-7">
+      <Card tone="topic" className="mb-5 p-6 pl-7">
         <p className="t-micro mb-3 text-ink-muted">Topic</p>
         <p className="t-title-2">{topic.prompt}</p>
       </Card>
 
-      <Card className="mb-6 p-5">
-        <p className="t-micro mb-2 text-ink-muted">
-          {isSpeaking ? "Speaking" : "Listening"}
-        </p>
-        <p className="t-body-lg">{turns[turnIndex]}</p>
-      </Card>
+      {/*
+       * What it just said, and whose turn it is. One line of state rather than
+       * a chat log: this is a conversation held out loud, and a scrollback
+       * would quietly turn it into a reading exercise.
+       */}
+      <Console label={isSpeaking ? "AI · speaking" : "AI · listening"} className="mb-5">
+        <p className="t-body-lg mb-5">{turns[turnIndex]}</p>
+        <Telemetry>
+          <TelemetryRow
+            label="Turn"
+            value={`${turnIndex + 1} of ${turns.length}`}
+            tone="dim"
+          />
+          <TelemetryRow
+            label="Floor"
+            value={isSpeaking ? "AI is talking" : "yours"}
+            tone={isSpeaking ? "dim" : "live"}
+          />
+        </Telemetry>
+      </Console>
 
-      <Card tone="sunken" className="mb-6 flex items-center gap-4 p-4">
+      <div className="rail rail--accent mb-5 flex items-center gap-4 rounded-md border border-hairline bg-sunken p-4">
         <div className="flex h-10 w-16 shrink-0 items-center justify-center text-accent-bright">
           <Waveform levels={mic.levels} className="h-8" />
         </div>
         <p className="t-label">You</p>
-      </Card>
+      </div>
 
       <div className="mt-auto flex items-center gap-3 border-t border-hairline pt-4">
         <Button variant="secondary" size="lg" onClick={nextTurn}>

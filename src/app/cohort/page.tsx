@@ -4,7 +4,9 @@ import { joinPublicRoom } from "@/app/actions/account";
 import { FlowSpine } from "@/components/onboarding/FlowSpine";
 import { Button } from "@/components/ui/Button";
 import { getCurrentProfile } from "@/lib/auth";
+import { CAN_STORE_ACCOUNTS } from "@/lib/deployment";
 import { PUBLIC_COHORT_NAMES } from "@/lib/public-room";
+import { ensureSeedCohorts } from "@/lib/store/seed";
 
 export const metadata = { title: "Where you'll be matched · On Air" };
 
@@ -14,6 +16,15 @@ export default async function CohortPage() {
   if (!profile.rulesAcceptedAt) redirect("/rules");
 
   const openRoomName = PUBLIC_COHORT_NAMES[profile.ageBand];
+
+  /*
+   * The seeded development rings — a code to type against, and the age-band
+   * refusal they exist to prove. Only where there is a store to hold them: on
+   * a deployment the open room above is the whole answer, and writing seed
+   * rows on every render would be a write that fails.
+   */
+  const seeded = CAN_STORE_ACCOUNTS ? await ensureSeedCohorts() : [];
+  const openToYou = seeded.filter((cohort) => cohort.ageBand === profile.ageBand);
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-14">
@@ -46,7 +57,13 @@ export default async function CohortPage() {
 
       <div className="border-t border-hairline pt-8">
         <p className="t-label mb-3">Have a code instead?</p>
-        <CohortForm openCohorts={[]} />
+        <CohortForm
+          openCohorts={openToYou.map((cohort) => ({
+            id: cohort.id,
+            name: cohort.name,
+            inviteCode: cohort.inviteCode,
+          }))}
+        />
       </div>
     </main>
   );

@@ -1,12 +1,13 @@
 "use client";
 
-import { Badge } from "@/components/ui/Badge";
+import { Console } from "@/components/console/Console";
+import { Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Waveform } from "@/components/ui/Waveform";
 import { formatClock, useElapsed } from "@/hooks/useElapsed";
 import type { MicStatus } from "@/hooks/useMicLevels";
-import { queueStatus, warmupAt } from "@/lib/warmups";
+import { queueScope, queueStatus, warmupAt } from "@/lib/warmups";
 
 type Props = {
   waitingSince: number | null;
@@ -27,6 +28,15 @@ const REQUEUE_COPY: Record<string, string> = {
   "you-did-not-answer": "That one timed out. Back in the queue.",
 };
 
+/**
+ * The wait, drawn as a readout rather than as a spinner.
+ *
+ * A queue is the one screen where a product usually lies — a fake progress
+ * bar, an invented count of people online. Everything on this panel is a
+ * measurement: how long you have waited, how many others are actually in your
+ * rooms, and how wide the matcher has widened the search. That is also what
+ * makes the wait bearable, because it is visibly doing something.
+ */
 export function QueueView({
   waitingSince,
   othersWaiting,
@@ -44,28 +54,36 @@ export function QueueView({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="mb-8 flex items-center justify-between">
-        <Badge>In the queue</Badge>
-        <span className="tabular t-caption text-ink-muted">
-          {formatClock(seconds)}
-        </span>
-      </header>
+      <Console label="Queue · searching" className="mb-5">
+        <Telemetry className="mb-6">
+          <TelemetryRow
+            label="Waiting"
+            value={formatClock(seconds)}
+            tone="live"
+          />
+          <TelemetryRow
+            label="Others in your rooms"
+            value={othersWaiting}
+            tone={othersWaiting > 0 ? "live" : "dim"}
+          />
+          <TelemetryRow label="Search" value={queueScope(seconds)} tone="dim" />
+          <TelemetryRow
+            label="Mic"
+            value={isMicLive ? "live" : "not started"}
+            tone={isMicLive ? "live" : "warn"}
+          />
+        </Telemetry>
 
-      <h1 className="t-title-1 mb-2">{queueStatus(seconds, othersWaiting)}</h1>
-
-      {/*
-        A real number or nothing at all. A fabricated "142 people practising"
-        is a lie users eventually catch, and it is the kind that makes them
-        distrust the score too.
-      */}
-      <p className="t-body mb-8 text-ink-muted">
-        {othersWaiting > 0
-          ? `${othersWaiting} other ${othersWaiting === 1 ? "person is" : "people are"} waiting in your groups.`
-          : "You're the only one waiting in your groups right now."}
-      </p>
+        <h1 className="t-title-2 mb-2">{queueStatus(seconds, othersWaiting)}</h1>
+        <p className="t-body text-ink-muted">
+          {othersWaiting > 0
+            ? `${othersWaiting} other ${othersWaiting === 1 ? "person is" : "people are"} waiting where you can be matched.`
+            : "Nobody else is waiting this second. The search widens on its own, and an AI partner picks it up if the room stays empty."}
+        </p>
+      </Console>
 
       {requeueReason ? (
-        <Card tone="sunken" className="mb-6 p-4">
+        <Card tone="sunken" className="mb-5 p-4">
           <p className="t-caption">
             {REQUEUE_COPY[requeueReason] ?? "Back in the queue."}
           </p>
@@ -77,7 +95,7 @@ export function QueueView({
         time productively, it proves the app works before a stranger is
         listening, and it is real feedback rather than a spinner.
       */}
-      <Card className="mb-6 p-6">
+      <Console label="Mic check" tone="sunken" isQuiet className="mb-5">
         <div className="mb-5 flex items-center gap-5">
           <div className="flex h-16 w-24 shrink-0 items-center justify-center text-accent-bright">
             <Waveform levels={micLevels} className="h-10" />
@@ -106,16 +124,16 @@ export function QueueView({
         )}
 
         {micError ? (
-          <p className="t-caption mt-3 text-danger">{micError}</p>
+          <p className="t-caption mt-3 text-danger-ink">{micError}</p>
         ) : null}
-      </Card>
+      </Console>
 
       {/*
         Offered as a real option, not a consolation prize — and labelled
         honestly. Nobody gets quietly handed a robot.
       */}
       {isAiOffered ? (
-        <Card tone="topic" className="mb-6 p-6 pl-7">
+        <Card tone="topic" className="mb-5 p-6 pl-7">
           <p className="t-title-3 mb-1">Practise with the AI examiner instead?</p>
           <p className="t-body mb-4 text-ink-muted">
             Same topic, same timer, same report at the end. It just isn&rsquo;t a

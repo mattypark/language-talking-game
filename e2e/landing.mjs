@@ -8,7 +8,7 @@
 import { chromium } from "playwright";
 
 const OUT = "./e2e/screenshots";
-const BASE = "http://localhost:3000";
+const BASE = process.env.ONAIR_BASE ?? "http://localhost:3000";
 
 const browser = await chromium.launch({ channel: "chrome" });
 const errors = [];

@@ -666,3 +666,225 @@
 .mic-check--live {
   color: var(--stage-accent);
 }
+
+/* ================================================================= console
+ *
+ * The broadcast console. This is the layer that makes the product read as
+ * equipment rather than as a page: corner ticks instead of shadows, a hairline
+ * bed instead of a card fill, and mono telemetry where a marketing site would
+ * put an adjective.
+ *
+ * Nothing here is a new colour. Every value is an existing token, so the
+ * contrast audit still covers it and the chroma ceiling still holds — the
+ * futurism is in the STRUCTURE (ticks, rails, measured rows), which is also
+ * why it survives grayscale.
+ */
+
+.console {
+  position: relative;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-6);
+}
+
+.console--sunken {
+  background: var(--sunken);
+}
+
+.console--flush {
+  padding: 0;
+}
+
+/*
+ * Corner ticks. Two pseudo-elements, two opposite corners — enough to read as
+ * a framed instrument, and it costs no elements. They sit OUTSIDE the border
+ * so they never crowd the content.
+ */
+.console::before,
+.console::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--accent-bright);
+  pointer-events: none;
+}
+
+.console::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: var(--radius-md);
+}
+
+.console::after {
+  right: -1px;
+  bottom: -1px;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* The only accent on the screen belongs to the action, so a console that sits
+ * next to a primary button gives its ticks up rather than competing. */
+.console--quiet::before,
+.console--quiet::after {
+  border-color: var(--hairline-strong);
+}
+
+/*
+ * The channel label, sat on the top border.
+ *
+ * Mono, tabular, micro — the one place letterspaced uppercase is allowed,
+ * because here it is an equipment label rather than a hero eyebrow.
+ */
+.console__label {
+  position: absolute;
+  top: 0;
+  left: var(--space-5);
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-2);
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro-lh);
+  letter-spacing: var(--text-micro-ls);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Telemetry rows: what a status readout looks like when the numbers are real.
+ * Key left in subtle ink, value right in mono. Dotted leader between them so a
+ * column of rows reads as an instrument panel rather than a definition list.
+ */
+.telemetry {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.telemetry__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.telemetry__key {
+  flex: none;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro-lh);
+  letter-spacing: var(--text-micro-ls);
+  text-transform: uppercase;
+}
+
+.telemetry__leader {
+  flex: 1;
+  height: 1px;
+  min-width: var(--space-4);
+  background: var(--hairline);
+}
+
+.telemetry__value {
+  flex: none;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.telemetry__value--live {
+  color: var(--live-ink);
+}
+
+.telemetry__value--warn {
+  color: var(--warn-ink);
+}
+
+.telemetry__value--dim {
+  color: var(--ink-muted);
+}
+
+/*
+ * The rail. A 2px vertical mark that says which row is the live one.
+ * Same job as the topic card's rail, reused rather than reinvented.
+ */
+.rail {
+  position: relative;
+  padding-left: var(--space-4);
+}
+
+.rail::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-strong);
+}
+
+.rail--live::before {
+  background: var(--live);
+}
+
+.rail--partner::before {
+  background: var(--partner);
+}
+
+.rail--accent::before {
+  background: var(--accent-bright);
+}
+
+/*
+ * The bed: a hairline grid behind the launch console.
+ *
+ * Single colour, no ramp — this is ruled paper, not a gradient. It is drawn
+ * with linear-gradient because that is the only way CSS draws a repeating
+ * hairline, and the "no gradients" rule is about two-hue washes, which this
+ * is not: both stops are the same token at the same alpha.
+ */
+.grid-bed {
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(to right, oklch(0.945 0.01 85 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.945 0.01 85 / 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/*
+ * Connection strength, as three bars rather than as an adjective.
+ * Never colour alone: the bar count carries the same information.
+ */
+.signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.signal__bar {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--hairline-strong);
+}
+
+.signal__bar:nth-child(1) { height: 40%; }
+.signal__bar:nth-child(2) { height: 70%; }
+.signal__bar:nth-child(3) { height: 100%; }
+
+.signal__bar--on {
+  background: var(--live);
+}
+
+.signal__bar--warn {
+  background: var(--warn);
+}

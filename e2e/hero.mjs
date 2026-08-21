@@ -6,7 +6,7 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", e => errors.push(String(e)));
 page.on("console", m => { if (m.type()==="error" && !m.text().includes("404")) errors.push(m.text()); });
-await page.goto("http://localhost:3000/", { waitUntil: "networkidle" });
+await page.goto((process.env.ONAIR_BASE ?? "http://localhost:3000") + "/", { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 
 // Underline animates in on hover.

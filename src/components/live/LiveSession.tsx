@@ -418,6 +418,7 @@ export function LiveSession({
     return (
       <ProposalView
         partner={matchmaker.state.partner}
+        expiresAt={matchmaker.state.proposalExpiresAt}
         isWaitingForPartner={matchmaker.state.proposalId === null}
         onAccept={() => {
           if (matchmaker.state.proposalId) {

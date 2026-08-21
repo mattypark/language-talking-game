@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-const BASE = "http://localhost:3000";
+const BASE = process.env.ONAIR_BASE ?? "http://localhost:3000";
 const OUT = "./e2e/screenshots";
 
 const browser = await chromium.launch({
@@ -35,8 +35,8 @@ await a.page.goto(`${BASE}/practice/live?language=en&topic=any`);
 await a.page.waitForSelector("text=/queue/i");
 await b.page.goto(`${BASE}/practice/live?language=en&topic=any`);
 await Promise.all([
-  a.page.waitForSelector("text=Found someone"),
-  b.page.waitForSelector("text=Found someone"),
+  a.page.waitForSelector("text=Match found"),
+  b.page.waitForSelector("text=Match found"),
 ]);
 await a.page.getByRole("button", { name: /ready/i }).click();
 await b.page.getByRole("button", { name: /ready/i }).click();

@@ -14,7 +14,7 @@
 import { readdir } from "node:fs/promises";
 import { chromium } from "playwright";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.ONAIR_BASE ?? "http://localhost:3000";
 const OUT = "./e2e/screenshots";
 
 const browser = await chromium.launch({
@@ -71,8 +71,8 @@ await bob.page.goto(`${BASE}/practice/live`);
 
 // Both should be offered each other.
 await Promise.all([
-  alice.page.waitForSelector("text=Found someone", { timeout: 10_000 }),
-  bob.page.waitForSelector("text=Found someone", { timeout: 10_000 }),
+  alice.page.waitForSelector("text=Match found", { timeout: 10_000 }),
+  bob.page.waitForSelector("text=Match found", { timeout: 10_000 }),
 ]);
 console.log("ok   both sides were proposed a partner");
 await alice.page.screenshot({ path: `${OUT}/s4-proposed.png`, fullPage: true });

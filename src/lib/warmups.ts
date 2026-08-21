@@ -39,3 +39,19 @@ export function queueStatus(seconds: number, othersWaiting: number): string {
   if (seconds < 75) return "It's thin at the moment. Hang on a little longer.";
   return "Nobody free right now.";
 }
+
+/**
+ * How wide the search is right now, as a readout.
+ *
+ * Mirrors the widening ladder in services/matchmaker/src/matchmaker.js — the
+ * queue screen shows what the matcher is actually doing rather than a spinner,
+ * and "widening" is the one honest thing to say about a thin pool. The service
+ * owns the behaviour; this is only its label, so a drift here costs a wrong
+ * word rather than a wrong match.
+ */
+export function queueScope(seconds: number): string {
+  if (seconds < 20) return "your level ±1";
+  if (seconds < 45) return "any level";
+  if (seconds < 75) return "any room";
+  return "AI partner offered";
+}

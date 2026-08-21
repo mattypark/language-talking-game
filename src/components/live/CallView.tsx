@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Console } from "@/components/console/Console";
+import { SignalBars, Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -39,6 +41,20 @@ type Props = {
 
 const WARNING_SECONDS = 30;
 
+/**
+ * The call.
+ *
+ * Two states of one screen rather than two screens: voice is the default and
+ * cameras are something both people opt into mid-call, so turning video on
+ * must not rearrange anything they were already using. The topic, the meters,
+ * the timer and the controls stay exactly where they were — the tiles appear
+ * above them.
+ *
+ * Everything on the status line is measured: the connection state comes from
+ * the peer connection, the strength bars from that same state, and "relayed"
+ * means the media really is going through TURN. None of it is decorative,
+ * which is the difference between a status line and an ornament.
+ */
 export function CallView({
   topic,
   partner,
@@ -74,19 +90,28 @@ export function CallView({
   const isRunningOut = secondsRemaining <= WARNING_SECONDS;
   const youAreSpeaking = !isMuted && isSpeaking(localLevels);
   const theyAreSpeaking = isSpeaking(remoteLevels);
+  const isVideoOn = videoState === "on";
 
   return (
     <div className="flex flex-1 flex-col">
       {/* The remote audio itself. Nothing to look at; it just has to play. */}
       <audio ref={audioRef} autoPlay playsInline />
 
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      {/* ------------------------------------------------------ status line */}
+      <header className="mb-5 flex items-center justify-between gap-4 border-b border-hairline pb-4">
+        <div className="flex items-center gap-3">
           {callStatus === "connected" ? (
             <LiveDot />
           ) : (
             <Badge tone="warn">{connectionLabel(callStatus)}</Badge>
           )}
+          <SignalBars
+            strength={signalStrength(callStatus, isRelayed)}
+            tone={callStatus === "connected" && !isRelayed ? "live" : "warn"}
+            label={`Connection: ${connectionLabel(callStatus).toLowerCase()}${
+              isRelayed ? ", relayed" : ""
+            }`}
+          />
           {isRelayed ? <Badge>Relayed</Badge> : null}
         </div>
 
@@ -99,11 +124,38 @@ export function CallView({
       </header>
 
       {/*
-        The topic card is the hero of this screen, not the two faces. It is the
-        only element carrying an accent, because "what do I say" is the failure
-        mode that kills every peer-practice product.
+        Cameras only appear once both people agreed. Until then this is a voice
+        call and looks like one — the tiles are added above the meters rather
+        than replacing them, so nothing anyone was already using moves.
       */}
-      <Card tone="topic" className="mb-6 p-6 pl-7">
+      {isVideoOn ? (
+        <div className="relative mb-5">
+          <VideoTile
+            stream={remoteStream}
+            isLive={hasRemoteVideo}
+            label={partner.displayName}
+            tone="partner"
+            isSpeaking={theyAreSpeaking}
+          />
+          <div className="absolute right-3 bottom-3 w-1/3 max-w-[9rem]">
+            <VideoTile
+              stream={localVideo}
+              isLive={localVideo !== null}
+              label="You"
+              tone="you"
+              isSelf
+              isSpeaking={youAreSpeaking}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/*
+        The topic is the hero of this screen, not the two faces. It is the only
+        element carrying an accent, because "what do I say" is the failure mode
+        that kills every peer-practice product.
+      */}
+      <Card tone="topic" className="mb-5 p-6 pl-7">
         <p className="t-micro mb-3 text-ink-muted">Topic</p>
         <p className="t-title-2 mb-4">{topic.prompt}</p>
         <ul className="space-y-1">
@@ -115,33 +167,43 @@ export function CallView({
         </ul>
       </Card>
 
-      {/*
-        Cameras only appear once both people agreed. Until then this is a voice
-        call and looks like one.
-      */}
-      {videoState === "on" ? (
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          <VideoTile stream={remoteStream} isLive={hasRemoteVideo} label={partner.displayName} tone="partner" />
-          <VideoTile stream={localVideo} isLive={localVideo !== null} label="You" tone="you" isMuted />
+      {/* -------------------------------------------------------- the meters */}
+      <Console label={isVideoOn ? "Voice · video" : "Voice"} tone="sunken" isQuiet className="mb-5">
+        <div className="mb-5 space-y-3">
+          <SpeakerTile
+            name={partner.displayName}
+            levels={remoteLevels}
+            isActive={theyAreSpeaking}
+            tone="partner"
+            note={remoteStream ? undefined : "Connecting…"}
+          />
+          <SpeakerTile
+            name={`${displayName} (you)`}
+            levels={localLevels}
+            isActive={youAreSpeaking}
+            tone="you"
+            note={isMuted ? "Muted" : undefined}
+          />
         </div>
-      ) : null}
 
-      <div className="mb-6 space-y-3">
-        <SpeakerTile
-          name={partner.displayName}
-          levels={remoteLevels}
-          isActive={theyAreSpeaking}
-          tone="partner"
-          note={remoteStream ? undefined : "Connecting…"}
-        />
-        <SpeakerTile
-          name={`${displayName} (you)`}
-          levels={localLevels}
-          isActive={youAreSpeaking}
-          tone="you"
-          note={isMuted ? "Muted" : undefined}
-        />
-      </div>
+        <Telemetry>
+          <TelemetryRow
+            label="Connection"
+            value={callStatus === "connected" ? "peer to peer" : connectionLabel(callStatus).toLowerCase()}
+            tone={callStatus === "connected" ? "live" : "warn"}
+          />
+          <TelemetryRow
+            label="Camera"
+            value={isVideoOn ? "on · both agreed" : "off"}
+            tone="dim"
+          />
+          <TelemetryRow
+            label="Time left"
+            value={formatClock(secondsRemaining)}
+            tone={isRunningOut ? "warn" : "dim"}
+          />
+        </Telemetry>
+      </Console>
 
       {isRunningOut ? (
         <p className="t-caption mb-4 text-warn-ink" role="status">
@@ -153,7 +215,7 @@ export function CallView({
         Controls stay visible. Zoom hides them until hover; Meet does not. For a
         five-minute session with a stranger, hiding the mute button is hostile.
       */}
-      <div className="mt-auto flex items-center gap-3 border-t border-hairline pt-4">
+      <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
         <Button
           variant={isMuted ? "primary" : "secondary"}
           size="lg"
@@ -163,12 +225,7 @@ export function CallView({
           {isMuted ? "Unmute" : "Mute"}
         </Button>
 
-        {/*
-          Leave is a ghost until it is confirmed. A red-filled button sitting
-          next to an orange primary is a genuine misclick risk, and misclicking
-          this one ends the session for both people.
-        */}
-        {videoState === "on" ? (
+        {isVideoOn ? (
           <Button variant="secondary" size="lg" onClick={onStopVideo}>
             Stop video
           </Button>
@@ -192,6 +249,11 @@ export function CallView({
           Report
         </Button>
 
+        {/*
+          Leave is a ghost until it is confirmed. A red-filled button sitting
+          next to an orange primary is a genuine misclick risk, and misclicking
+          this one ends the session for both people.
+        */}
         {isConfirmingLeave ? (
           <Button variant="danger" size="lg" onClick={onLeave} className="ml-auto">
             End it for both of us
@@ -276,19 +338,24 @@ const REPORT_REASONS = [
 /**
  * A camera tile. Local video is mirrored and muted — hearing yourself is
  * unusable, and an unmirrored self-view reads as someone else's face.
+ *
+ * Speaking is drawn with a ring here and with a ring plus a tint on the
+ * meters below, so the state is never carried by colour alone.
  */
 function VideoTile({
   stream,
   isLive,
   label,
   tone,
-  isMuted = false,
+  isSelf = false,
+  isSpeaking = false,
 }: {
   stream: MediaStream | null;
   isLive: boolean;
   label: string;
   tone: "you" | "partner";
-  isMuted?: boolean;
+  isSelf?: boolean;
+  isSpeaking?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
 
@@ -299,18 +366,23 @@ function VideoTile({
   return (
     <div
       className={cn(
-        "relative aspect-[4/3] overflow-hidden rounded-md border bg-sunken",
-        tone === "partner" ? "border-partner" : "border-accent-bright",
+        "relative overflow-hidden rounded-md border bg-sunken",
+        isSelf ? "aspect-[3/4]" : "aspect-video",
+        isSpeaking
+          ? tone === "partner"
+            ? "border-partner"
+            : "border-accent-bright"
+          : "border-hairline",
       )}
     >
       <video
         ref={ref}
         autoPlay
         playsInline
-        muted={isMuted}
+        muted={isSelf}
         className={cn(
           "h-full w-full object-cover",
-          isMuted && "[transform:scaleX(-1)]",
+          isSelf && "[transform:scaleX(-1)]",
           !isLive && "opacity-0",
         )}
       />
@@ -334,9 +406,23 @@ function connectionLabel(status: CallStatus): string {
       return "Reconnecting";
     case "failed":
       return "Connection lost";
+    case "connected":
+      return "Connected";
     default:
       return "Not connected";
   }
+}
+
+/**
+ * Three bars, and the third one is reserved for a direct peer connection.
+ *
+ * Relayed audio genuinely is worse — an extra hop through TURN — so it reads
+ * as two bars rather than three. That is a measurement, not a penalty.
+ */
+function signalStrength(status: CallStatus, isRelayed: boolean): number {
+  if (status === "connected") return isRelayed ? 2 : 3;
+  if (status === "connecting" || status === "reconnecting") return 1;
+  return 0;
 }
 
 type TileProps = {
@@ -348,7 +434,7 @@ type TileProps = {
 };
 
 /**
- * Speaking state is carried by TWO signals — a ring and a background tint —
+ * Speaking state is carried by TWO signals — a rail and a background tint —
  * because colour alone fails WCAG 1.4.1 and this screen has to be readable in
  * grayscale.
  */
@@ -358,7 +444,8 @@ function SpeakerTile({ name, levels, isActive, tone, note }: TileProps) {
   return (
     <div
       className={cn(
-        "flex items-center gap-4 rounded-md border p-4 transition-colors duration-100",
+        "rail flex items-center gap-4 rounded-md border p-4 transition-colors duration-100",
+        isPartner ? "rail--partner" : "rail--accent",
         isActive
           ? isPartner
             ? "border-partner bg-partner-tint"

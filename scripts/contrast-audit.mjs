@@ -107,7 +107,7 @@ const PAIRS = [
 
 const browser = await chromium.launch({ channel: "chrome" });
 const page = await browser.newPage();
-await page.goto("http://localhost:3000/styleguide", { waitUntil: "networkidle" });
+await page.goto((process.env.ONAIR_BASE ?? "http://localhost:3000") + "/styleguide", { waitUntil: "networkidle" });
 
 const results = await page.evaluate((pairs) => {
   const probe = document.createElement("span");

@@ -14,7 +14,7 @@
 import { chromium } from "playwright";
 
 const OUT = "./e2e/screenshots";
-const BASE = "http://localhost:3000";
+const BASE = process.env.ONAIR_BASE ?? "http://localhost:3000";
 
 const browser = await chromium.launch({ channel: "chrome" });
 const ctx = await browser.newContext({ viewport: { width: 480, height: 900 }, deviceScaleFactor: 2 });
@@ -57,12 +57,12 @@ await step("home", async () => {
 });
 
 await step("welcome", async () => {
-  await page.getByRole("link", { name: "Join a room" }).first().click();
+  await page.getByRole("link", { name: "Go on air" }).first().click();
   await page.waitForURL("**/welcome");
 });
 
 await step("join form", async () => {
-  await page.getByRole("button", { name: "Set yourself up" }).click();
+  await page.getByRole("link", { name: "Make an account" }).click();
   await page.waitForURL("**/join");
 });
 

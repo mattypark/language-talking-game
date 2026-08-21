@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-const BASE = "http://localhost:3000";
+const BASE = process.env.ONAIR_BASE ?? "http://localhost:3000";
 const OUT = "./e2e/screenshots";
 
 const browser = await chromium.launch({

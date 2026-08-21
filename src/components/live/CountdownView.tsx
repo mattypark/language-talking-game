@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Console } from "@/components/console/Console";
+import { Telemetry, TelemetryRow } from "@/components/console/Telemetry";
 import { Card } from "@/components/ui/Card";
 import type { PartnerSummary, Topic } from "@/lib/matchmaker-protocol";
 
@@ -33,13 +35,27 @@ export function CountdownView({ partner, topic, seconds, onDone }: Props) {
 
   return (
     <div className="flex flex-1 flex-col justify-center">
-      <p className="t-body mb-5 text-center text-ink-muted">
-        You and {partner.displayName} are on in
-      </p>
+      <Console label="Standing by" className="mb-5">
+        <Telemetry className="mb-6">
+          <TelemetryRow label="Partner" value={partner.displayName} />
+          <TelemetryRow label="Mic" value="opens at zero" tone="dim" />
+          <TelemetryRow
+            label="On air in"
+            value={`${Math.max(0, remaining)}s`}
+            tone="live"
+          />
+        </Telemetry>
 
-      <p className="t-display mb-8 text-center tabular-nums" aria-live="polite">
-        {Math.max(0, remaining)}
-      </p>
+        <p className="t-body mb-3 text-ink-muted">
+          You and {partner.displayName} are on in
+        </p>
+        <p
+          className="t-timer tabular-nums text-accent-ink"
+          aria-live="polite"
+        >
+          {Math.max(0, remaining)}
+        </p>
+      </Console>
 
       <Card tone="topic" className="p-6 pl-7">
         <p className="t-micro mb-3 text-ink-muted">Your topic</p>

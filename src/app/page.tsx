@@ -26,7 +26,7 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-3">
             <Link href="/welcome">
               <Button variant="primary" size="lg">
-                Join a room
+                Go on air
               </Button>
             </Link>
             <Link href="/styleguide">
@@ -112,7 +112,7 @@ export default function HomePage() {
           <h2 className="t-title-1 mb-6">Say something out loud today.</h2>
           <Link href="/welcome">
             <Button variant="primary" size="lg">
-              Join a room
+              Go on air
             </Button>
           </Link>
         </section>

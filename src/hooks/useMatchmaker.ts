@@ -24,6 +24,8 @@ export type MatchmakerState = {
   othersWaiting: number;
   rooms: Record<string, number>;
   proposalId: string | null;
+  /** Server clock. The proposal screen clamps it — see ProposalView. */
+  proposalExpiresAt: number | null;
   partner: PartnerSummary | null;
   sessionId: string | null;
   topic: Topic | null;
@@ -39,6 +41,7 @@ const INITIAL: MatchmakerState = {
   othersWaiting: 0,
   rooms: {},
   proposalId: null,
+  proposalExpiresAt: null,
   partner: null,
   sessionId: null,
   topic: null,
@@ -126,6 +129,7 @@ export function useMatchmaker({
           othersWaiting: event.othersWaiting,
           rooms: event.rooms ?? {},
           proposalId: null,
+          proposalExpiresAt: null,
           partner: null,
         }));
 
@@ -134,6 +138,7 @@ export function useMatchmaker({
           ...s,
           phase: "proposed",
           proposalId: event.proposalId,
+          proposalExpiresAt: event.expiresAt,
           partner: event.partner,
           lastRequeueReason: null,
         }));
@@ -147,6 +152,7 @@ export function useMatchmaker({
           isOfferer: event.isOfferer,
           partner: event.partner,
           proposalId: null,
+          proposalExpiresAt: null,
         }));
 
       case "requeued":
@@ -154,6 +160,7 @@ export function useMatchmaker({
           ...s,
           phase: "queued",
           proposalId: null,
+          proposalExpiresAt: null,
           partner: null,
           lastRequeueReason: event.reason,
         }));
